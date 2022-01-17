@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FUJI_SOURCE_WALLET = exports.TEST_DATABASE_NAME = exports.LIVE_DATABASE_NAME = exports.FUJI_AVAX = exports.MAINNET_AVAX = exports.PROFIT_ADDRESS = exports.SERVICE_FEE = exports.JOB = void 0;
+const avalanche_1 = require("avalanche");
+exports.JOB = "TEST";
+exports.SERVICE_FEE = new avalanche_1.BN(2000000);
+exports.PROFIT_ADDRESS = "TODO";
+exports.MAINNET_AVAX = "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z";
+exports.FUJI_AVAX = "U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK";
+exports.LIVE_DATABASE_NAME = "AvaTrades-DynamoDB";
+exports.TEST_DATABASE_NAME = "AvaTrades-DynamoDB-Test";
+exports.FUJI_SOURCE_WALLET = "TODO";

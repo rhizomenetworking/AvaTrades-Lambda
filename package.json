@@ -1,0 +1,17 @@
+{
+  "name": "AvaTrades-Lambda",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/rhizomenetworking/AvaTrades-Lambda.git",
+  "author": "Alexander McElroy <admin@rhizomenetworking.com>",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^4.5.4"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.47.0",
+    "@types/uuid": "^8.3.4",
+    "avalanche": "^3.10.2"
+  }
+}
