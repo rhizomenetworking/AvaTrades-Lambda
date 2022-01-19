@@ -22,7 +22,8 @@ function serve(event) {
         let status_code = 200;
         let response;
         if (resource === "/avatrades/trades" && method === "GET") {
-            response = readTrade(params);
+            let prep = yield (0, prepare_1.prepareReadTrade)(params);
+            response = readTrade(prep);
         }
         else if (resource === "/avatrades/trades" && method === "POST") {
             let prep = (0, prepare_1.prepareCreateTrade)(params);

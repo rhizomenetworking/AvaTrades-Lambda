@@ -9,19 +9,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports._deleteTrade = exports.putRoyalty = exports.putBid = exports.putTrade = exports.fetchRoyalty = exports.fetchTrade = exports.fetchBids = exports.fetchLiveTrades = void 0;
+exports.deleteTrade = exports.putRoyalty = exports.putBid = exports.putTrade = exports.fetchRoyalty = exports.fetchTrade = exports.fetchBids = exports.fetchLiveTrades = void 0;
 const constants_1 = require("./constants");
 const client_dynamodb_1 = require("@aws-sdk/client-dynamodb");
 const model_1 = require("./model");
+const avalanche_1 = require("avalanche");
+const bintools = avalanche_1.BinTools.getInstance();
 const DATABASE_NAME = (constants_1.JOB === "TEST") ? constants_1.TEST_DATABASE_NAME : constants_1.LIVE_DATABASE_NAME;
 const client = new client_dynamodb_1.DynamoDBClient({ region: "us-east-2" });
 function fetchLiveTrades(page) {
     return __awaiter(this, void 0, void 0, function* () {
         let input = {
             "TableName": DATABASE_NAME,
-            "KeyConditionExpression": "pk = TRADE",
+            "KeyConditionExpression": "pk = :trade",
             "ExclusiveStartKey": (page === "FIRST" || page === undefined) ? undefined : page,
-            "FilterExpression": "properties.status = PENDING or properties.status = OPEN"
+            "FilterExpression": "properties.#S = PENDING or properties.#S = #O",
+            "ExpressionAttributeValues": { ":trade": { "S": "TRADE" } },
+            "ExpressionAttributeNames": { "#S": "status", "#O": "OPEN" }
         };
         let command = new client_dynamodb_1.QueryCommand(input);
         let response = yield client.send(command);
@@ -82,7 +86,7 @@ function fetchRoyalty(chain, asset_id) {
             "TableName": DATABASE_NAME,
             "Key": {
                 "pk": { "S": chain },
-                "sk": { "S": asset_id }
+                "sk": { "S": bintools.cb58Encode(asset_id) }
             }
         };
         let command = new client_dynamodb_1.GetItemCommand(input);
@@ -126,7 +130,7 @@ function putRoyalty(royalty) {
     });
 }
 exports.putRoyalty = putRoyalty;
-function _deleteTrade(trade_id) {
+function deleteTrade(trade_id) {
     return __awaiter(this, void 0, void 0, function* () {
         let input = {
             "TableName": DATABASE_NAME,
@@ -139,4 +143,4 @@ function _deleteTrade(trade_id) {
         yield client.send(command);
     });
 }
-exports._deleteTrade = _deleteTrade;
+exports.deleteTrade = deleteTrade;

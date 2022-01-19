@@ -1,4 +1,5 @@
-import { Trade, Bid, Royalty, TradeStatus } from "./model"
+import { Trade, Bid, Royalty, TradeStatus, stringFromAddress, stringFromAssetID} from "./model"
+
 
 interface APIMessage {
     message: string;
@@ -28,22 +29,23 @@ interface APITrade {
 
 function makeAPIWallet(trade: Trade, bid?: Bid): APIWallet {
     let wallet = (bid === undefined) ? trade.wallet : bid.wallet;
+    let asset_ids = wallet.asset_ids.map(id => stringFromAssetID(id));
     return {
         "trade_id": trade.id,
-        "address": wallet.address,
-        "asset_ids": wallet.asset_ids,
+        "address": stringFromAddress(wallet.chain, wallet.address),
+        "asset_ids": asset_ids,
         "expiration": wallet.expiration.toString(),
         "chain": wallet.chain,
-        "owner": trade.proceeds_address
+        "owner": stringFromAddress(wallet.chain, trade.proceeds_address)
     }
 }
 
 function makeAPIRoyalty(royalty: Royalty): APIRoyalty {
     return {
         "chain": royalty.chain,
-        "asset_id": royalty.asset_id,
+        "asset_id": stringFromAssetID(royalty.asset_id),
         "divisor": royalty.divisor.toString(),
-        "owner": royalty.proceeds_address
+        "owner": stringFromAddress(royalty.chain, royalty.proceeds_address)
     }
 }
 

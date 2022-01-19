@@ -35,11 +35,7 @@ exports.handler = function (event, context, callback) {
             }
             catch (err) {
                 console.log(err);
-                let response = {
-                    "statusCode": 400,
-                    "body": "Failed to complete test"
-                };
-                callback(null, response);
+                callback(err, null);
             }
         }
     });

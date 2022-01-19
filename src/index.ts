@@ -20,11 +20,7 @@ exports.handler = async function(event: any, context: any, callback: any) {
             callback(null, response);
         } catch (err) {
             console.log(err)
-            let response = {
-                "statusCode": 400,
-                "body": "Failed to complete test"
-            }
-            callback(null, response)
+            callback(err, null)
         }
     }
 }

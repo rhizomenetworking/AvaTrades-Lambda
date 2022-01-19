@@ -18,7 +18,8 @@ async function serve(event: any): Promise<any> {
     let status_code: number = 200;
     let response: any;
     if (resource === "/avatrades/trades" && method === "GET") {
-        response = readTrade(params);
+        let prep = await prepareReadTrade(params);
+        response = readTrade(prep);
 
     } else if (resource === "/avatrades/trades" && method === "POST") {
         let prep = prepareCreateTrade(params);

@@ -12,8 +12,9 @@ import {
     bidAsItem, itemAsBid, 
     royaltyAsItem, itemAsRoyalty
 } from "./model"
+import { Buffer, BinTools } from "avalanche";
 
-
+const bintools = BinTools.getInstance();
 const DATABASE_NAME = (JOB === "TEST") ? TEST_DATABASE_NAME : LIVE_DATABASE_NAME;
 const client = new DynamoDBClient({ region: "us-east-2" });
 type Page = "FIRST" | any
@@ -21,9 +22,11 @@ type Page = "FIRST" | any
 async function fetchLiveTrades(page: Page): Promise<[Trade[], Page | undefined]> {
     let input: QueryCommandInput = {
         "TableName": DATABASE_NAME,
-        "KeyConditionExpression": "pk = TRADE",
+        "KeyConditionExpression": "pk = :trade",
         "ExclusiveStartKey": (page === "FIRST" || page === undefined) ? undefined : page,
-        "FilterExpression": "properties.status = PENDING or properties.status = OPEN"
+        "FilterExpression": "properties.#S = PENDING or properties.#S = #O",
+        "ExpressionAttributeValues": {":trade": {"S": "TRADE"}},
+        "ExpressionAttributeNames": {"#S": "status", "#O": "OPEN"}
     }
     let command = new QueryCommand(input);
     let response = await client.send(command);
@@ -73,12 +76,12 @@ async function fetchTrade(trade_id: string): Promise<Trade | undefined> {
     return trade
 }
 
-async function fetchRoyalty(chain: Chain, asset_id: string): Promise<Royalty | undefined> {
+async function fetchRoyalty(chain: Chain, asset_id: Buffer): Promise<Royalty | undefined> {
     let input: GetItemCommandInput = {
         "TableName": DATABASE_NAME,
         "Key": {
             "pk": {"S": chain},
-            "sk": {"S": asset_id}
+            "sk": {"S": bintools.cb58Encode(asset_id)}
         }
     }
     let command = new GetItemCommand(input);
@@ -115,7 +118,7 @@ async function putRoyalty(royalty: Royalty) {
     await client.send(command);
 }
 
-async function _deleteTrade(trade_id: string) {
+async function deleteTrade(trade_id: string) {
     let input: DeleteItemCommandInput = {
         "TableName": DATABASE_NAME,
         "Key": {
@@ -130,4 +133,4 @@ async function _deleteTrade(trade_id: string) {
 export { Page }
 export { fetchLiveTrades, fetchBids, fetchTrade, fetchRoyalty }
 export { putTrade, putBid, putRoyalty }
-export { _deleteTrade }
+export { deleteTrade }
