@@ -3,44 +3,28 @@ OUTCOME: Pending Trade
 1) Pending Auction whoose wallet is not expired
 
 OUTCOME: Locked Trade
-1) Pending Auction only lacking NFT       
-2) Pending Auction only lacking service fee
-3) Pending Auction lacking both NFT and service fee
-4) Pending Auction with service fee and NFT, but too many UTXOs
+1) Pending Auction whoose wallet is not expired, but has recieved too many UTXOs     
+2) Pending Auction whoose wallet is expired, but only lacking asset
+3) Pending Auction whoose wallet is expired, but only lacking service fee
+4) Pending Auction whoose wallet is expired, but lacking both NFT and service fee
 
 OUTCOME: Open Trade
-1) Pending Auction has service fee + one NFT
-2) Pending Auction has service fee + many NFTs
-3) Pending Auction has service fee + one FT
-4) Pending Auction has service fee + many FT
-5) Open Auction has no bids, but has not expired
-6) Open Auction has bids above ask, but has not expired
-7) Open Fixed has bids below ask, but has not expired
+) Pending Auction has service fee + one NFT
+) Pending Auction has service fee + many NFTs
+) Pending Auction has service fee + one FT
+) Pending Auction has service fee + many FT
+) Open Auction has no bids, but has not expired
+) Open Auction has bids above ask, but has not expired
+) Open Fixed has bids below ask, but has not expired
 
 OUTCOME: Expired Trade
-1) Open Auction has expired with zero bids
-2) Open Auction has expired with many bids below ask
+) Open Auction has expired with zero bids
+) Open Auction has expired with many bids below ask
 
 OUTCOME: Closed Trade
-1) Open Auction has expired with many locked, open, and closed bids above ask
-2) Open Fixed has expired with exactly one bid at ask price, but seller needs change
-3) Open Fixed has expired with exactly one bid above ask price and royalty
-
-TRADES
-0) Fresh Pending Auction
-1) Pending Auction only lacking NFT
-2)
-3)
-4)
-5)
-6)
-
-
-FAUCET 
-1) At least 10 AVAX
-
-USERS
-1-5) 2 AVAX, 5 NFT of group i, 100000 FT 
+) Open Auction has expired with many locked, open, and closed bids above ask
+) Open Fixed has expired with exactly one bid at ask price, but seller needs change
+) Open Fixed has expired with exactly one bid above ask price and royalty
 
 */
 
@@ -48,10 +32,10 @@ import { Avalanche, BN, Buffer, BinTools } from "avalanche";
 import { runMonitor } from "./monitor"
 import { prepareCreateTrade, prepareReadTrade } from "./prepare";
 import { createTrade, readTrade } from "./service";
-import { deleteTrade } from "./database";
+import { deleteTrade, fetchTrade, putTrade } from "./database";
 import { TxConstruction, makeTxConstruction, addInput, addOutput, addNFTTransferOp, issue, addInputs } from "./tx_construction";
 import { TEST_SUPPLIER_PRIVATE_KEY } from "./secrets";
-import { TEST_SINK_ADDRESS, FUJI_NETWORK, TEST_NFT_ID, TEST_FT_ID, SERVICE_FEE } from "./constants";
+import { FUJI_NETWORK, TEST_NFT_ID, TEST_FT_ID, SERVICE_FEE, TEST_SUPPLIER_ADDRESS } from "./constants";
 import { fetchUTXOs, getBalance } from "./blockchain";
 import { Trade, TradeStatus} from "./model";
 import { addressFromString, getAvaxID, stringFromAddress, stringFromAssetID, assetIdFromString, makeKeyPair } from "./common";
@@ -65,7 +49,7 @@ export async function runTestSuite() {
     console.log("Issuing Transaction ...")
     let tx_id = await issue(test_suite.txc);
     console.log("Sleeping ...")
-    await sleep(2000);
+    await sleep(3000);
     console.log("Running Monitor ...")
     await runMonitor();
     console.log("Sleeping ...")
@@ -120,6 +104,15 @@ async function getTradeStatus(trade_id: string): Promise<TradeStatus> {
     return api_trade.status
 }
 
+async function expireTradeWallet(trade_id: string) {
+    let trade = await fetchTrade(trade_id);
+    if (trade === undefined) {
+        throw "Expire Trade Wallet - Trade Not Found"
+    }
+    trade.wallet.expiration = 0;
+    await putTrade(trade);
+}
+
 interface TestSuite {
     supplier: KeyPair;
     supplied_avax: BN;
@@ -167,8 +160,9 @@ async function generateTestSuite(): Promise<TestSuite> {
     let txc = makeTxConstruction("Fuji-x", "Ava Trades Test Suite");
     let test_suite = makeTestSuite(txc);
     test_suite = await addSupplierResources(test_suite);
-    test_suite = await addTestCase_0(test_suite);
-    test_suite = await addTestCase_1(test_suite);
+    for (let addTestCase of ADD_TEST_CASES) {
+        test_suite = await addTestCase(test_suite);
+    }
     test_suite = await returnUnusedSupplierResources(test_suite);
     return test_suite
 }
@@ -215,7 +209,7 @@ function addFTTransfer(test_suite: TestSuite, to_address: Buffer, amount: BN): T
 async function addAVAXTransfer(test_suite: TestSuite, to_address: Buffer, amount: BN): Promise<TestSuite> {
     let avax_id = await getAvaxID("Fuji-x");
     test_suite.txc = addOutput(test_suite.txc, to_address, avax_id, amount);
-    test_suite.supplied_ft = test_suite.supplied_ft.sub(amount);
+    test_suite.supplied_avax = test_suite.supplied_avax.sub(amount);
     return test_suite
 }
 
@@ -223,40 +217,116 @@ async function sleep(ms: number) {
     await new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
+const ADD_TEST_CASES = [
+    addTestCase_P1,
+    addTestCase_L1,
+    addTestCase_L2,
+    addTestCase_L3,
+    addTestCase_L4
+]
 
 
 //--------------------------TEST CASES ----------------------------------//
-async function addTestCase_0(test_suite: TestSuite): Promise<TestSuite> {
+async function addTestCase_P1(test_suite: TestSuite): Promise<TestSuite> {
     let params = {
         "asset_id": TEST_NFT_ID,
         "ask": "10000000000",
         "allows_bidding": "true",
-        "address": TEST_SINK_ADDRESS,
+        "address": TEST_SUPPLIER_ADDRESS,
         "chain": "Fuji-x"
     }
     let prep = prepareCreateTrade(params);
     let response = await createTrade(prep);
     let trade_id = response.trade_id;
-    let test_case = makeTestCase("0", trade_id, "PENDING");
+    let test_case = makeTestCase("P1", trade_id, "PENDING");
     test_suite.test_cases.push(test_case);
     return test_suite
 }
 
-async function addTestCase_1(test_suite: TestSuite): Promise<TestSuite> {
+async function addTestCase_L1(test_suite: TestSuite): Promise<TestSuite> {
     let params = {
-        "asset_id": TEST_NFT_ID,
+        "asset_id": TEST_FT_ID,
         "ask": "10000000000",
         "allows_bidding": "true",
-        "address": TEST_SINK_ADDRESS,
+        "address": TEST_SUPPLIER_ADDRESS,
         "chain": "Fuji-x"
     }
     let prep = prepareCreateTrade(params);
     let response = await createTrade(prep);
     let wallet_address = addressFromString("Fuji-x", response.address);
+    let avax_id = await getAvaxID("Fuji-x");
+    test_suite = addFTTransfer(test_suite, wallet_address, new BN(1));
+    test_suite = await addAVAXTransfer(test_suite, wallet_address, SERVICE_FEE);
     test_suite = addNFTTransfer(test_suite, wallet_address);
-    let expected_balances: AssetAddressAmount = [assetIdFromString(TEST_NFT_ID), wallet_address, new BN(1)];
-    let test_case = makeTestCase("1", response.trade_id, "PENDING", [expected_balances]);
+
+    let expected_balances: AssetAddressAmount[] = [
+        [assetIdFromString(TEST_FT_ID), wallet_address, new BN(1)],
+        [avax_id, wallet_address, SERVICE_FEE],
+        [assetIdFromString(TEST_NFT_ID), wallet_address, new BN(1)]
+    ];
+    let test_case = makeTestCase("L1", response.trade_id, "LOCKED", expected_balances);
     test_suite.test_cases.push(test_case);
     return test_suite
+}
+
+async function addTestCase_L2(test_suite: TestSuite): Promise<TestSuite> {
+    let params = {
+        "asset_id": TEST_FT_ID,
+        "ask": "10000000000",
+        "allows_bidding": "true",
+        "address": TEST_SUPPLIER_ADDRESS,
+        "chain": "Fuji-x"
+    }
+    let prep = prepareCreateTrade(params);
+    let response = await createTrade(prep);
+    let wallet_address = addressFromString("Fuji-x", response.address);
+    let avax_id = await getAvaxID("Fuji-x");
+
+    test_suite = await addAVAXTransfer(test_suite, wallet_address, SERVICE_FEE);
+    let expected_balances: AssetAddressAmount[] = [
+        [avax_id, wallet_address, SERVICE_FEE]
+    ];
+    await expireTradeWallet(response.trade_id);
+    let test_case = makeTestCase("L2", response.trade_id, "LOCKED", expected_balances);
+    test_suite.test_cases.push(test_case);
+    return test_suite 
+}
+
+async function addTestCase_L3(test_suite: TestSuite): Promise<TestSuite> {
+    let params = {
+        "asset_id": TEST_FT_ID,
+        "ask": "10000000000",
+        "allows_bidding": "true",
+        "address": TEST_SUPPLIER_ADDRESS,
+        "chain": "Fuji-x"
+    }
+    let prep = prepareCreateTrade(params);
+    let response = await createTrade(prep);
+    let wallet_address = addressFromString("Fuji-x", response.address);
+
+    test_suite = addFTTransfer(test_suite, wallet_address, new BN(1));
+    let expected_balances: AssetAddressAmount[] = [
+        [assetIdFromString(TEST_FT_ID), wallet_address, new BN(1)]
+    ];
+    await expireTradeWallet(response.trade_id);
+    let test_case = makeTestCase("L3", response.trade_id, "LOCKED", expected_balances);
+    test_suite.test_cases.push(test_case);
+    return test_suite 
+}
+
+async function addTestCase_L4(test_suite: TestSuite): Promise<TestSuite> {
+    let params = {
+        "asset_id": TEST_FT_ID,
+        "ask": "10000000000",
+        "allows_bidding": "true",
+        "address": TEST_SUPPLIER_ADDRESS,
+        "chain": "Fuji-x"
+    }
+    let prep = prepareCreateTrade(params);
+    let response = await createTrade(prep);
+
+    await expireTradeWallet(response.trade_id);
+    let test_case = makeTestCase("L4", response.trade_id, "LOCKED");
+    test_suite.test_cases.push(test_case);
+    return test_suite 
 }

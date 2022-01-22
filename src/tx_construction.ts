@@ -94,7 +94,6 @@ async function issue(txc: TxConstruction): Promise<string> {
     if (burn.gt(SERVICE_FEE)) {
         throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds service fee" 
     }
-    //TODO: Check if transaction is too large
     let key_chain = xchain.keyChain();
     let signed_tx = unsigned_tx.sign(key_chain);
     let tx_id = await xchain.issueTx(signed_tx);

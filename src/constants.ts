@@ -15,6 +15,5 @@ export const FUJI_PROFIT_ADDRESS = "X-fuji1pqz2umzdf7wcudxdxqu6kkx2esy4z8m593xzu
 export const TEST_NFT_ID = "GsEZLRzeFEGGv5RVZb1cKJPqixn5WY2VB9m3oZkT2R6kMZuAE";
 export const TEST_FT_ID = "2cDzgmQEYS6ZrfJzkuJd2FTFpkz8AhZrw1NtrqEnWMCVHMiZCx";
 export const TEST_SUPPLIER_ADDRESS = "X-fuji1tukttg52tjdqr8cavl6hvt507sgg60ehh8zuzm";
-export const TEST_SINK_ADDRESS = FUJI_PROFIT_ADDRESS;
 
 type Job = "SERVER" | "MONITOR" | "TEST"

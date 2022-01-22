@@ -84,7 +84,6 @@ function issue(txc) {
         if (burn.gt(constants_1.SERVICE_FEE)) {
             throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds service fee";
         }
-        //TODO: Check if transaction is too large
         let key_chain = xchain.keyChain();
         let signed_tx = unsigned_tx.sign(key_chain);
         let tx_id = yield xchain.issueTx(signed_tx);

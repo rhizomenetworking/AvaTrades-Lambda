@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TEST_SINK_ADDRESS = exports.TEST_SUPPLIER_ADDRESS = exports.TEST_FT_ID = exports.TEST_NFT_ID = exports.FUJI_PROFIT_ADDRESS = exports.AVALANCHE_PROFIT_ADDRESS = exports.TEST_DATABASE_NAME = exports.LIVE_DATABASE_NAME = exports.FUJI_NETWORK = exports.AVALANCHE_NETWORK = exports.SERVICE_FEE = exports.JOB = void 0;
+exports.TEST_SUPPLIER_ADDRESS = exports.TEST_FT_ID = exports.TEST_NFT_ID = exports.FUJI_PROFIT_ADDRESS = exports.AVALANCHE_PROFIT_ADDRESS = exports.TEST_DATABASE_NAME = exports.LIVE_DATABASE_NAME = exports.FUJI_NETWORK = exports.AVALANCHE_NETWORK = exports.SERVICE_FEE = exports.JOB = void 0;
 const avalanche_1 = require("avalanche");
 exports.JOB = "TEST";
 exports.SERVICE_FEE = new avalanche_1.BN(2000000);
@@ -13,4 +13,3 @@ exports.FUJI_PROFIT_ADDRESS = "X-fuji1pqz2umzdf7wcudxdxqu6kkx2esy4z8m593xzun";
 exports.TEST_NFT_ID = "GsEZLRzeFEGGv5RVZb1cKJPqixn5WY2VB9m3oZkT2R6kMZuAE";
 exports.TEST_FT_ID = "2cDzgmQEYS6ZrfJzkuJd2FTFpkz8AhZrw1NtrqEnWMCVHMiZCx";
 exports.TEST_SUPPLIER_ADDRESS = "X-fuji1tukttg52tjdqr8cavl6hvt507sgg60ehh8zuzm";
-exports.TEST_SINK_ADDRESS = exports.FUJI_PROFIT_ADDRESS;

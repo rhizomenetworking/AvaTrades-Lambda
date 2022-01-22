@@ -46,7 +46,8 @@ function syncWallet(wallet) {
         if (wallet.status !== "OPEN") {
             return wallet;
         }
-        let utxos = yield fetchUTXOs(wallet.address, wallet.chain, wallet.asset_ids);
+        let utxos = yield fetchUTXOs(wallet.address, wallet.chain, wallet.asset_ids, wallet.asset_ids.length);
+        console.log(utxos);
         if (utxos === undefined) {
             wallet.status = "LOCKED";
             return wallet;
@@ -74,13 +75,13 @@ function closeWalletIfPossible(wallet) {
         return wallet;
     });
 }
-function fetchUTXOs(address, chain, asset_ids) {
+function fetchUTXOs(address, chain, asset_ids, limit = 1024) {
     return __awaiter(this, void 0, void 0, function* () {
         let xchain = (0, common_1.getNetwork)(chain).XChain();
         let address_string = (0, common_1.stringFromAddress)(chain, address);
         let response = yield xchain.getUTXOs(address_string);
         let utxos = response.utxos.getAllUTXOs();
-        if (utxos.length >= 1024) {
+        if (utxos.length >= limit) {
             return undefined;
         }
         let result = [];
