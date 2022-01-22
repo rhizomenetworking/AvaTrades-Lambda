@@ -10,6 +10,7 @@ import {
 } from "./api_contract"
 
 
+//TODO: Add Helpful error messages
 async function serve(event: any): Promise<any> {
     let params = event.queryStringParameters;
     let resource = event.resource;
@@ -49,7 +50,7 @@ async function serve(event: any): Promise<any> {
 }
 
 async function createTrade(prep: PreparedCreateTrade): Promise<APIWallet> {
-    let new_trade = makeTrade(
+    let new_trade = await makeTrade(
         prep.asset_id,
         prep.ask,
         prep.mode,
@@ -61,7 +62,7 @@ async function createTrade(prep: PreparedCreateTrade): Promise<APIWallet> {
 
 async function createBid(prep: PreparedCreateBid): Promise<APIWallet> {
     let trade = prep.trade;
-    let new_bid = makeBid(trade, prep.proceeds_address);
+    let new_bid = await makeBid(trade, prep.proceeds_address);
     await putBid(new_bid);
     return makeAPIWallet(trade, new_bid)
 }

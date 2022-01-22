@@ -1,7 +1,17 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.issue = exports.addNFTTransferOp = exports.addOutput = exports.addInputs = exports.addInput = exports.makeTxConstruction = void 0;
 const avalanche_1 = require("avalanche");
+const common_1 = require("./common");
 const constants_1 = require("./constants");
 const avm_1 = require("avalanche/dist/apis/avm");
 const bintools = avalanche_1.BinTools.getInstance();
@@ -63,14 +73,23 @@ function addNFTTransferOp(txc, utxo, to_address) {
 }
 exports.addNFTTransferOp = addNFTTransferOp;
 function issue(txc) {
-    let network = (txc.chain === "Fuji-x") ? constants_1.FUJI_NETWORK : constants_1.AVALANCHE_NETWORK;
-    let xchain = network.XChain();
-    let blockchain_id = xchain.getBlockchainID();
-    let op_tx = new avm_1.OperationTx(network.getNetworkID(), bintools.cb58Decode(blockchain_id), txc.outputs, txc.inputs, txc.memo, txc.ops);
-    let unsigned_tx = new avm_1.UnsignedTx(op_tx);
-    let key_chain = xchain.keyChain();
-    let signed_tx = unsigned_tx.sign(key_chain);
-    return xchain.issueTx(signed_tx);
+    return __awaiter(this, void 0, void 0, function* () {
+        let network = (0, common_1.getNetwork)(txc.chain);
+        let xchain = network.XChain();
+        let blockchain_id = xchain.getBlockchainID();
+        let op_tx = new avm_1.OperationTx(network.getNetworkID(), bintools.cb58Decode(blockchain_id), txc.outputs, txc.inputs, txc.memo, txc.ops);
+        let unsigned_tx = new avm_1.UnsignedTx(op_tx);
+        let avax_id = yield (0, common_1.getAvaxID)(txc.chain);
+        let burn = unsigned_tx.getBurn(avax_id);
+        if (burn.gt(constants_1.SERVICE_FEE)) {
+            throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds service fee";
+        }
+        //TODO: Check if transaction is too large
+        let key_chain = xchain.keyChain();
+        let signed_tx = unsigned_tx.sign(key_chain);
+        let tx_id = yield xchain.issueTx(signed_tx);
+        return tx_id;
+    });
 }
 exports.issue = issue;
 function addSigner(signers, address) {

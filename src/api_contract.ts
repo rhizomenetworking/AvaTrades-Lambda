@@ -1,4 +1,5 @@
-import { Trade, Bid, Royalty, TradeStatus, stringFromAddress, stringFromAssetID} from "./model"
+import { Trade, Bid, Royalty, TradeStatus } from "./model"
+import { stringFromAddress, stringFromAssetID } from "./common"
 
 
 interface APIMessage {

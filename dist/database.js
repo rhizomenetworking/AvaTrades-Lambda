@@ -11,10 +11,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteTrade = exports.putRoyalty = exports.putBid = exports.putTrade = exports.fetchRoyalty = exports.fetchTrade = exports.fetchBids = exports.fetchLiveTrades = void 0;
 const constants_1 = require("./constants");
+const common_1 = require("./common");
 const client_dynamodb_1 = require("@aws-sdk/client-dynamodb");
 const model_1 = require("./model");
-const avalanche_1 = require("avalanche");
-const bintools = avalanche_1.BinTools.getInstance();
 const DATABASE_NAME = (constants_1.JOB === "TEST") ? constants_1.TEST_DATABASE_NAME : constants_1.LIVE_DATABASE_NAME;
 const client = new client_dynamodb_1.DynamoDBClient({ region: "us-east-2" });
 function fetchLiveTrades(page) {
@@ -23,9 +22,9 @@ function fetchLiveTrades(page) {
             "TableName": DATABASE_NAME,
             "KeyConditionExpression": "pk = :trade",
             "ExclusiveStartKey": (page === "FIRST" || page === undefined) ? undefined : page,
-            "FilterExpression": "properties.#S = PENDING or properties.#S = #O",
+            //"FilterExpression": "properties.#S = PENDING or properties.#S = #O", TODO
             "ExpressionAttributeValues": { ":trade": { "S": "TRADE" } },
-            "ExpressionAttributeNames": { "#S": "status", "#O": "OPEN" }
+            //"ExpressionAttributeNames": {"#S": "status", "#O": "OPEN"} TODO
         };
         let command = new client_dynamodb_1.QueryCommand(input);
         let response = yield client.send(command);
@@ -86,7 +85,7 @@ function fetchRoyalty(chain, asset_id) {
             "TableName": DATABASE_NAME,
             "Key": {
                 "pk": { "S": chain },
-                "sk": { "S": bintools.cb58Encode(asset_id) }
+                "sk": { "S": (0, common_1.stringFromAssetID)(asset_id) }
             }
         };
         let command = new client_dynamodb_1.GetItemCommand(input);

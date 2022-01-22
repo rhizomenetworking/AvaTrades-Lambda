@@ -1,6 +1,6 @@
 import { BinTools, BN, Buffer } from "avalanche";
-import { Chain } from "./model";
-import { AVALANCHE_NETWORK, FUJI_NETWORK } from "./constants";
+import { Chain, getAvaxID, getNetwork } from "./common";
+import { SERVICE_FEE } from "./constants";
 import { 
     UTXO, 
     OperationTx, UnsignedTx, 
@@ -76,8 +76,8 @@ function addNFTTransferOp(txc: TxConstruction, utxo: UTXO, to_address: Buffer) {
     return txc
 }
 
-function issue(txc: TxConstruction): Promise<string> {
-    let network = (txc.chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
+async function issue(txc: TxConstruction): Promise<string> {
+    let network = getNetwork(txc.chain);
     let xchain = network.XChain();
     let blockchain_id = xchain.getBlockchainID();
     let op_tx = new OperationTx(
@@ -89,9 +89,16 @@ function issue(txc: TxConstruction): Promise<string> {
         txc.ops)
 
     let unsigned_tx = new UnsignedTx(op_tx);
+    let avax_id = await getAvaxID(txc.chain);
+    let burn: BN = unsigned_tx.getBurn(avax_id);
+    if (burn.gt(SERVICE_FEE)) {
+        throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds service fee" 
+    }
+    //TODO: Check if transaction is too large
     let key_chain = xchain.keyChain();
     let signed_tx = unsigned_tx.sign(key_chain);
-    return xchain.issueTx(signed_tx)
+    let tx_id = await xchain.issueTx(signed_tx);
+    return tx_id
 }
 
 function addSigner(signers: Buffer[], address: Buffer): number {

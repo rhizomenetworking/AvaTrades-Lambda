@@ -1,11 +1,10 @@
 import { BN, Buffer } from "avalanche";
-import { Trade, Bid, Royalty, Wallet, Chain, stringFromAddress, stringFromAssetID, getAvaxID, getProfitAddress } from "./model";
-import { SERVICE_FEE, AVALANCHE_NETWORK, FUJI_NETWORK } from "./constants";
+import { Chain, getNetwork, stringFromAddress, getAvaxID, getProfitAddress } from "./common"
+import { Trade, Bid, Royalty, Wallet } from "./model";
+import { SERVICE_FEE } from "./constants";
 import { TxConstruction, makeTxConstruction, addInput, addInputs, addOutput, addNFTTransferOp, issue } from "./tx_construction";
 import { UTXO, SECPTransferOutput, NFTTransferOutput } from "avalanche/dist/apis/avm"
 
-// const avalanche_xchain = AVALANCHE_NETWORK.XChain();
-// const fuji_xchain = FUJI_NETWORK.XChain();
 
 async function syncTrade(trade: Trade, bids: Bid[], royalty: Royalty | undefined): Promise<Trade> {
     if (trade.status === "PENDING") {
@@ -28,15 +27,10 @@ async function syncBid(bid: Bid): Promise<Bid>{
 }
 
 async function syncWallet(wallet: Wallet): Promise<Wallet> {
-    let network = (wallet.chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
-    let xchain = network.XChain();
-    xchain.keyChain().addKey(wallet.private_key);
     if (wallet.status !== "OPEN") {
         return wallet
     }
-    let address_string = stringFromAddress(wallet.chain, wallet.address);
-    let asset_id_strings = wallet.asset_ids.map(id => stringFromAssetID(id));
-    let utxos = await fetchUTXOs(address_string, wallet.chain, asset_id_strings);
+    let utxos = await fetchUTXOs(wallet.address, wallet.chain, wallet.asset_ids);
     if (utxos === undefined) {
         wallet.status = "LOCKED";
         return wallet
@@ -45,15 +39,15 @@ async function syncWallet(wallet: Wallet): Promise<Wallet> {
     return closeWalletIfPossible(wallet)
 }
 
-function closeWalletIfPossible(wallet: Wallet): Wallet {
+async function closeWalletIfPossible(wallet: Wallet): Promise<Wallet> {
     let now = new Date().getTime();
     if (wallet.status !== "OPEN" || now <= wallet.expiration) {
         return wallet
     }
-    let avax_id = getAvaxID(wallet.chain);
+    let avax_id = await getAvaxID(wallet.chain);
     let can_close: Boolean = true;
     for (let asset_id of wallet.asset_ids) {
-        let min_balance = (asset_id === avax_id) ? wallet.avax_requirement : new BN(1);
+        let min_balance = (asset_id.equals(avax_id)) ? wallet.avax_requirement : new BN(1);
         let balance = getBalance(wallet.utxos, asset_id);
         if (balance.lt(min_balance)) {
             can_close = false
@@ -63,11 +57,11 @@ function closeWalletIfPossible(wallet: Wallet): Wallet {
     return wallet
 }
 
-async function fetchUTXOs(address: string, chain: Chain, asset_ids: string[]): Promise<UTXO[] | undefined> {
-    let network = (chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
-    let response = await network.XChain().getUTXOs(address);
+async function fetchUTXOs(address: Buffer, chain: Chain, asset_ids: Buffer[]): Promise<UTXO[] | undefined> {
+    let xchain = getNetwork(chain).XChain();
+    let address_string = stringFromAddress(chain, address);
+    let response = await xchain.getUTXOs(address_string);
     let utxos = response.utxos.getAllUTXOs();
-    console.log(utxos)
     if (utxos.length >= 1024) {
         return undefined
     }
@@ -80,7 +74,7 @@ async function fetchUTXOs(address: string, chain: Chain, asset_ids: string[]): P
     return result
 }
 
-function isAcceptableUTXO(utxo: UTXO, asset_ids: string[]): Boolean {
+function isAcceptableUTXO(utxo: UTXO, asset_ids: Buffer[]): Boolean {
     let is_acceptable_asset: Boolean = false;
     let no_locktime: Boolean = false;
     let single_threshold: Boolean = false;
@@ -88,7 +82,7 @@ function isAcceptableUTXO(utxo: UTXO, asset_ids: string[]): Boolean {
 
     let asset_id = utxo.getAssetID();
     for (let acceptable of asset_ids) {
-        if (asset_id.toString() === acceptable) {
+        if (asset_id.equals(acceptable)) {
             is_acceptable_asset = true;
         }
     }
@@ -106,13 +100,13 @@ function isAcceptableUTXO(utxo: UTXO, asset_ids: string[]): Boolean {
 }
 
 async function closeTradeIfPossible(trade: Trade, bids: Bid[], royalty: Royalty | undefined): Promise<Trade> {
-    let [highest_bidder, losing_bidders] = makeBidders(trade, bids);
+    let [highest_bidder, losing_bidders] = await makeBidders(trade, bids);
     if (trade.status !== "OPEN" || highest_bidder === undefined) {
         return trade
     }
     let now = new Date().getTime();
     let no_time_remaining = trade.deadline < now;
-    let avax_id = getAvaxID(trade.wallet.chain);
+    let avax_id = await getAvaxID(trade.wallet.chain);
     let can_sell = getBalance(highest_bidder.utxos, avax_id).gte(trade.ask);
     let can_close_auction = trade.mode === "AUCTION" && can_sell && no_time_remaining
     let can_close_fixed = trade.mode === "FIXED" && can_sell
@@ -120,8 +114,8 @@ async function closeTradeIfPossible(trade: Trade, bids: Bid[], royalty: Royalty 
     if (can_close_auction || can_close_fixed) {
         let memo = "AvaTrades - https://avatrades.io/" + trade.id;
         let txc = makeTxConstruction(trade.wallet.chain, memo);
-        txc = exchange(txc, trade, highest_bidder, royalty);
-        txc = returnAll(txc, losing_bidders);
+        txc = await exchange(txc, trade, highest_bidder, royalty);
+        txc = await returnAll(txc, losing_bidders);
         let receipt = await issue(txc);
         trade.receipt.push(receipt)        
         trade.status = "CLOSED"
@@ -136,14 +130,14 @@ async function expireTradeIfPossible(trade: Trade, bids: Bid[]): Promise<Trade> 
         return trade
     }
 
-    let [highest_bidder, losing_bidders] = makeBidders(trade, bids);
+    let [highest_bidder, losing_bidders] = await makeBidders(trade, bids);
     let all_bidders: Bidder[];
     let is_expired: Boolean;
     if (highest_bidder === undefined) {
         all_bidders = losing_bidders;
         is_expired = true;
     } else {
-        let avax_id = getAvaxID(trade.wallet.chain);
+        let avax_id = await getAvaxID(trade.wallet.chain);
         all_bidders = losing_bidders.concat([highest_bidder]);
         is_expired = getBalance(highest_bidder.utxos, avax_id).lt(trade.ask);
     }
@@ -151,7 +145,7 @@ async function expireTradeIfPossible(trade: Trade, bids: Bid[]): Promise<Trade> 
     if (is_expired) {
         let memo = "AvaTrades (Expired) - https://avatrades.io/" + trade.id;
         let txc = makeTxConstruction(trade.wallet.chain, memo);
-        txc = returnAll(txc, all_bidders, trade);
+        txc = await returnAll(txc, all_bidders, trade);
         let receipt = await issue(txc);
         trade.receipt.push(receipt);
         trade.status = "EXPIRED";
@@ -171,9 +165,8 @@ function makeBidder(address: Buffer): Bidder {
     }
 }
 
-function makeBidders(trade: Trade, bids: Bid[]): [Bidder | undefined, Bidder[]] {
+async function makeBidders(trade: Trade, bids: Bid[]): Promise<[Bidder | undefined, Bidder[]]> {
     let chain = trade.wallet.chain;
-    let network = (chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
     let closed_bids = bids.filter(bid => bid.wallet.status === "CLOSED");
     let bidders: Map<string, Bidder> = new Map<string, Bidder>();
     for (let bid of closed_bids) {
@@ -193,7 +186,7 @@ function makeBidders(trade: Trade, bids: Bid[]): [Bidder | undefined, Bidder[]] 
 
     let highest_bidder: Bidder | undefined = undefined;
     let losing_bidders: Bidder[] = [];
-    let avax_id = getAvaxID(trade.wallet.chain);
+    let avax_id = await getAvaxID(trade.wallet.chain);
     for (let [_, bidder] of bidders) {
         if (highest_bidder === undefined) {
             highest_bidder = bidder;
@@ -209,27 +202,25 @@ function makeBidders(trade: Trade, bids: Bid[]): [Bidder | undefined, Bidder[]] 
     return [highest_bidder, losing_bidders]
 }
 
-
-
-function returnAll(txc: TxConstruction, bidders: Bidder[], trade?: Trade | undefined): TxConstruction {
-    let avax_id = getAvaxID(txc.chain);
+async function returnAll(txc: TxConstruction, bidders: Bidder[], trade?: Trade | undefined): Promise<TxConstruction> {
+    let avax_id = await getAvaxID(txc.chain);
     for (let bidder of bidders) {
         let avax_balance = getBalance(bidder.utxos, avax_id);
         txc = addOutput(txc, bidder.address, avax_id, avax_balance);
         txc = addInputs(txc, bidder.utxos);
     }
     if (trade !== undefined) {
-        txc = exchange(txc, trade);
+        txc = await exchange(txc, trade);
     }
     return txc
 }
 
-function exchange(txc: TxConstruction, trade: Trade, bidder?: Bidder, royalty?: Royalty): TxConstruction {
-    let avax_id = getAvaxID(txc.chain);
+async function exchange(txc: TxConstruction, trade: Trade, bidder?: Bidder, royalty?: Royalty): Promise<TxConstruction> {
+    let avax_id = await getAvaxID(txc.chain);
     let ZERO = new BN(0);
 
-    let network = (txc.chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
-    let chain_fee = network.XChain().getTxFee();
+    let xchain = getNetwork(txc.chain).XChain();
+    let chain_fee = xchain.getTxFee();
     let profit = SERVICE_FEE.sub(chain_fee);
     let change = getBalance(trade.wallet.utxos, avax_id).sub(SERVICE_FEE);
     let profit_addresss = getProfitAddress(txc.chain);
@@ -283,4 +274,4 @@ function getBalance(utxos: UTXO[], asset_id: Buffer): BN {
     return balance
 }
 
-export { syncTrade, syncBid, getBalance }
+export { syncTrade, syncBid, getBalance, fetchUTXOs }

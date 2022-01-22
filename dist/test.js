@@ -54,7 +54,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.runTest = void 0;
+exports.runTestSuite = void 0;
 const avalanche_1 = require("avalanche");
 const monitor_1 = require("./monitor");
 const prepare_1 = require("./prepare");
@@ -64,108 +64,190 @@ const tx_construction_1 = require("./tx_construction");
 const secrets_1 = require("./secrets");
 const constants_1 = require("./constants");
 const blockchain_1 = require("./blockchain");
-const model_1 = require("./model");
-const bintools = avalanche_1.BinTools.getInstance();
-function runTest() {
+const common_1 = require("./common");
+function runTestSuite() {
     return __awaiter(this, void 0, void 0, function* () {
-        let context = yield setup();
+        console.log("Generating Test Suite ...");
+        let test_suite = yield generateTestSuite();
+        console.log("Issuing Transaction ...");
+        let tx_id = yield (0, tx_construction_1.issue)(test_suite.txc);
+        console.log("Sleeping ...");
+        yield sleep(2000);
+        console.log("Running Monitor ...");
         yield (0, monitor_1.runMonitor)();
-        context = yield check(context);
+        console.log("Sleeping ...");
+        yield sleep(1000);
+        console.log("Running Test Cases ...");
+        let report = "Test Suite Report --- " + tx_id + "\n\n";
+        for (let test_case of test_suite.test_cases) {
+            console.log("Running Test Case " + test_case.id + " ...");
+            let result = yield runTestCase(test_case);
+            console.log(result);
+            report += result;
+        }
         return {
             "statusCode": 200,
-            "body": createReport(context)
+            "body": report
         };
     });
 }
-exports.runTest = runTest;
-function setup() {
+exports.runTestSuite = runTestSuite;
+function runTestCase(test_case) {
     return __awaiter(this, void 0, void 0, function* () {
-        let context = yield createContext();
-        context = yield addTrade0(context);
-        //context = await addTrade1(context);
-        return context;
+        let trade_id = test_case.trade_id;
+        let result = "\nTest Case " + test_case.id + " (" + trade_id + ")\n    ---- ";
+        let expected_status = test_case.expected_status;
+        let actual_status = yield getTradeStatus(trade_id);
+        if (actual_status !== expected_status) {
+            result += "Invalid Trade Status, expected " + expected_status + " but found " + actual_status;
+            return result;
+        }
+        for (let [asset_id, address, amount] of test_case.expected_balances) {
+            let utxos = yield (0, blockchain_1.fetchUTXOs)(address, "Fuji-x", [asset_id]);
+            if (utxos === undefined) {
+                result += "Failed to get UTXOs of asset " + (0, common_1.stringFromAssetID)(asset_id) + " held by address " + (0, common_1.stringFromAddress)("Fuji-x", address);
+                return result;
+            }
+            let actual_amount = (0, blockchain_1.getBalance)(utxos, asset_id);
+            if (actual_amount.lt(amount)) {
+                result += "Invalid Balance of address " + (0, common_1.stringFromAddress)("Fuji-x", address) + ", expected " + amount.toJSON() + " but found " + actual_amount.toJSON();
+                return result;
+            }
+        }
+        yield (0, database_1.deleteTrade)(trade_id);
+        result += "PASSED";
+        return result;
     });
 }
-function check(context) {
-    return __awaiter(this, void 0, void 0, function* () {
-        context = yield removeTrade0(context);
-        return context;
-    });
-}
-function tmp() {
-    return __awaiter(this, void 0, void 0, function* () {
-        let context = yield createContext();
-        yield addTrade1(context);
-    });
-}
-function createContext() {
-    return __awaiter(this, void 0, void 0, function* () {
-        return {
-            "ft_asset_id": constants_1.TEST_FT_ID,
-            "nft_asset_id": constants_1.TEST_NFT_ID,
-            "trade_ids": [],
-            "txc": (0, tx_construction_1.makeTxConstruction)("Fuji-x", "Ava Trades Test"),
-            "result": [false, false]
-        };
-    });
-}
-function createReport(context) {
-    let message = "Test Report\n\n";
-    for (let i = 0; i < 1; i++) {
-        let result_i = context.result[i] ? "PASSED" : "FAILED";
-        message += "Test " + i.toString() + ": " + result_i + "\n";
-    }
-    return message;
-}
-function addTrade0(context) {
+function getTradeStatus(trade_id) {
     return __awaiter(this, void 0, void 0, function* () {
         let params = {
-            "asset_id": context.nft_asset_id,
+            "trade_id": trade_id
+        };
+        let prep = yield (0, prepare_1.prepareReadTrade)(params);
+        let api_trade = yield (0, service_1.readTrade)(prep);
+        return api_trade.status;
+    });
+}
+function makeTestSuite(txc) {
+    return {
+        "supplier": (0, common_1.makeKeyPair)("Fuji-x", secrets_1.TEST_SUPPLIER_PRIVATE_KEY),
+        "supplied_avax": new avalanche_1.BN(0),
+        "supplied_ft": new avalanche_1.BN(0),
+        "supplied_nfts": [],
+        "test_cases": [],
+        "txc": txc
+    };
+}
+function makeTestCase(id, trade_id, expected_status, expected_balances) {
+    return {
+        "id": id,
+        "trade_id": trade_id,
+        "expected_status": expected_status,
+        "expected_balances": (expected_balances === undefined) ? [] : expected_balances
+    };
+}
+function makeSinkAddressString() {
+    let key_pair = (0, common_1.makeKeyPair)("Fuji-x");
+    return key_pair.getAddressString();
+}
+function generateTestSuite() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let txc = (0, tx_construction_1.makeTxConstruction)("Fuji-x", "Ava Trades Test Suite");
+        let test_suite = makeTestSuite(txc);
+        test_suite = yield addSupplierResources(test_suite);
+        test_suite = yield addTestCase_0(test_suite);
+        test_suite = yield addTestCase_1(test_suite);
+        test_suite = yield returnUnusedSupplierResources(test_suite);
+        return test_suite;
+    });
+}
+function addSupplierResources(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let supplier = test_suite.supplier.getAddress();
+        let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
+        let ft_id = (0, common_1.assetIdFromString)(constants_1.TEST_FT_ID);
+        let fungible_utxos = yield (0, blockchain_1.fetchUTXOs)(supplier, "Fuji-x", [avax_id, ft_id]);
+        let nft_utxos = yield (0, blockchain_1.fetchUTXOs)(supplier, "Fuji-x", [(0, common_1.assetIdFromString)(constants_1.TEST_NFT_ID)]);
+        if (fungible_utxos === undefined || nft_utxos === undefined) {
+            throw "Add Supplier Resources - Failed te fetch supplier UTXOs";
+        }
+        test_suite.txc = (0, tx_construction_1.addInputs)(test_suite.txc, fungible_utxos);
+        test_suite.supplied_avax = (0, blockchain_1.getBalance)(fungible_utxos, avax_id);
+        test_suite.supplied_ft = (0, blockchain_1.getBalance)(fungible_utxos, ft_id);
+        test_suite.supplied_nfts = (nft_utxos === undefined) ? [] : nft_utxos;
+        return test_suite;
+    });
+}
+function returnUnusedSupplierResources(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let supplier_address = test_suite.supplier.getAddress();
+        test_suite = addFTTransfer(test_suite, supplier_address, test_suite.supplied_ft);
+        test_suite = yield addAVAXTransfer(test_suite, supplier_address, test_suite.supplied_avax.sub(constants_1.SERVICE_FEE));
+        return test_suite;
+    });
+}
+function addNFTTransfer(test_suite, to_address) {
+    let utxo = test_suite.supplied_nfts.pop();
+    if (utxo === undefined) {
+        throw "Add NFT Transfer - Not enough NFTs";
+    }
+    test_suite.txc = (0, tx_construction_1.addNFTTransferOp)(test_suite.txc, utxo, to_address);
+    return test_suite;
+}
+function addFTTransfer(test_suite, to_address, amount) {
+    let ft_id = (0, common_1.assetIdFromString)(constants_1.TEST_FT_ID);
+    test_suite.txc = (0, tx_construction_1.addOutput)(test_suite.txc, to_address, ft_id, amount);
+    test_suite.supplied_ft = test_suite.supplied_ft.sub(amount);
+    return test_suite;
+}
+function addAVAXTransfer(test_suite, to_address, amount) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
+        test_suite.txc = (0, tx_construction_1.addOutput)(test_suite.txc, to_address, avax_id, amount);
+        test_suite.supplied_ft = test_suite.supplied_ft.sub(amount);
+        return test_suite;
+    });
+}
+function sleep(ms) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield new Promise(resolve => setTimeout(resolve, ms));
+    });
+}
+//--------------------------TEST CASES ----------------------------------//
+function addTestCase_0(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let params = {
+            "asset_id": constants_1.TEST_NFT_ID,
             "ask": "10000000000",
             "allows_bidding": "true",
-            "address": constants_1.TEST_SINK_ADDRESSES[0],
+            "address": constants_1.TEST_SINK_ADDRESS,
             "chain": "Fuji-x"
         };
         let prep = (0, prepare_1.prepareCreateTrade)(params);
         let response = yield (0, service_1.createTrade)(prep);
-        context.trade_ids.push(response.trade_id);
-        return context;
+        let trade_id = response.trade_id;
+        let test_case = makeTestCase("0", trade_id, "PENDING");
+        test_suite.test_cases.push(test_case);
+        return test_suite;
     });
 }
-function removeTrade0(context) {
+function addTestCase_1(test_suite) {
     return __awaiter(this, void 0, void 0, function* () {
         let params = {
-            "trade_id": context.trade_ids[0]
+            "asset_id": constants_1.TEST_NFT_ID,
+            "ask": "10000000000",
+            "allows_bidding": "true",
+            "address": constants_1.TEST_SINK_ADDRESS,
+            "chain": "Fuji-x"
         };
-        let prep = yield (0, prepare_1.prepareReadTrade)(params);
-        let trade_1 = yield (0, service_1.readTrade)(prep);
-        if (trade_1.status === "PENDING") {
-            yield (0, database_1.deleteTrade)(trade_1.trade_id);
-            context.result[0] = true;
-        }
-        return context;
-    });
-}
-function addTrade1(context) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let key = constants_1.FUJI_NETWORK.XChain().keyChain().importKey(secrets_1.TEST_SUPPLIER_PRIVATE_KEY);
-        constants_1.FUJI_NETWORK.XChain().keyChain().addKey(key);
-        let txc = context.txc;
-        let supplier = (0, model_1.addressFromString)("Fuji-x", constants_1.TEST_SUPPLIER_ADDRESS);
-        let utxo_response = yield constants_1.FUJI_NETWORK.XChain().getUTXOs((0, model_1.stringFromAddress)("Fuji-x", supplier));
-        let utxos = utxo_response.utxos.getAllUTXOs();
-        for (let u of utxos) {
-            if (u.getAssetID().equals(bintools.cb58Decode(constants_1.FUJI_AVAX_ID))) {
-                txc = (0, tx_construction_1.addInput)(txc, u);
-            }
-        }
-        let avax_id = (0, model_1.getAvaxID)("Fuji-x");
-        let balance_after_fee = (0, blockchain_1.getBalance)(utxos, avax_id).sub(new avalanche_1.BN(1000000));
-        let sink = (0, model_1.addressFromString)("Fuji-x", constants_1.TEST_SINK_ADDRESSES[0]);
-        txc = (0, tx_construction_1.addOutput)(txc, supplier, avax_id, balance_after_fee);
-        txc = (0, tx_construction_1.addNFTTransferOp)(txc, utxos[200], sink);
-        let tx_id = yield (0, tx_construction_1.issue)(txc);
-        console.log(tx_id);
-        return context;
+        let prep = (0, prepare_1.prepareCreateTrade)(params);
+        let response = yield (0, service_1.createTrade)(prep);
+        let wallet_address = (0, common_1.addressFromString)("Fuji-x", response.address);
+        test_suite = addNFTTransfer(test_suite, wallet_address);
+        let expected_balances = [(0, common_1.assetIdFromString)(constants_1.TEST_NFT_ID), wallet_address, new avalanche_1.BN(1)];
+        let test_case = makeTestCase("1", response.trade_id, "PENDING", [expected_balances]);
+        test_suite.test_cases.push(test_case);
+        return test_suite;
     });
 }

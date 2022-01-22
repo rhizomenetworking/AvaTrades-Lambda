@@ -51,133 +51,212 @@ import { createTrade, readTrade } from "./service";
 import { deleteTrade } from "./database";
 import { TxConstruction, makeTxConstruction, addInput, addOutput, addNFTTransferOp, issue, addInputs } from "./tx_construction";
 import { TEST_SUPPLIER_PRIVATE_KEY } from "./secrets";
-import { TEST_SUPPLIER_ADDRESS, TEST_SINK_ADDRESSES, FUJI_NETWORK, FUJI_AVAX_ID, TEST_NFT_ID, TEST_FT_ID } from "./constants";
-import { getBalance } from "./blockchain";
-import { addressFromString, getAvaxID, stringFromAddress } from "./model";
+import { TEST_SINK_ADDRESS, FUJI_NETWORK, TEST_NFT_ID, TEST_FT_ID, SERVICE_FEE } from "./constants";
+import { fetchUTXOs, getBalance } from "./blockchain";
+import { Trade, TradeStatus} from "./model";
+import { addressFromString, getAvaxID, stringFromAddress, stringFromAssetID, assetIdFromString, makeKeyPair } from "./common";
+import { BaseNFTOutput } from "avalanche/dist/common";
+import { InitialStates, SECPMintOutput, UTXO, UTXOSet, UnsignedTx, Tx, SECPTransferOutput, KeyPair } from "avalanche/dist/apis/avm";
 
-const bintools = BinTools.getInstance();
 
-
-export async function runTest() {
-    let context = await setup();
+export async function runTestSuite() {
+    console.log("Generating Test Suite ...")
+    let test_suite = await generateTestSuite();
+    console.log("Issuing Transaction ...")
+    let tx_id = await issue(test_suite.txc);
+    console.log("Sleeping ...")
+    await sleep(2000);
+    console.log("Running Monitor ...")
     await runMonitor();
-    context = await check(context);
+    console.log("Sleeping ...")
+    await sleep(1000);
+    console.log("Running Test Cases ...")
+    let report = "Test Suite Report --- " + tx_id + "\n\n";
+    for (let test_case of test_suite.test_cases) {
+        console.log("Running Test Case " + test_case.id + " ...")
+        let result = await runTestCase(test_case);
+        console.log(result)
+        report += result;
+    }
     return {
         "statusCode": 200,
-        "body": createReport(context)
+        "body": report
     }
 }
 
-async function setup(): Promise<Context> {
-    let context = await createContext();
-    context = await addTrade0(context);
-    //context = await addTrade1(context);
-    return context
-}
-
-async function check(context: Context): Promise<Context> {
-    context = await removeTrade0(context);
-    return context
-}
-
-async function tmp() {
-    let context = await createContext();
-    await addTrade1(context);
-}
-//tmp()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-interface Context {
-    nft_asset_id: string;
-    ft_asset_id: string;
-    trade_ids: string[];
-    txc: TxConstruction;
-    result: Boolean[];
-}
-
-async function createContext(): Promise<Context> {
-    return {
-        "ft_asset_id": TEST_FT_ID, //TODO
-        "nft_asset_id": TEST_NFT_ID, //TODO
-        "trade_ids": [],
-        "txc": makeTxConstruction("Fuji-x", "Ava Trades Test"),
-        "result": [false, false]
+async function runTestCase(test_case: TestCase): Promise<string> {
+    let trade_id = test_case.trade_id;
+    let result = "\nTest Case " + test_case.id + " (" + trade_id + ")\n    ---- ";
+    let expected_status = test_case.expected_status;
+    let actual_status = await getTradeStatus(trade_id);
+    if (actual_status !== expected_status) {
+        result += "Invalid Trade Status, expected " + expected_status + " but found " + actual_status;
+        return result
     } 
-}
-
-function createReport(context: Context): string {
-    let message = "Test Report\n\n"
-    for (let i = 0; i < 1; i++) {
-        let result_i = context.result[i] ? "PASSED" : "FAILED";
-        message += "Test " + i.toString() + ": " + result_i + "\n";
+    
+    for (let [asset_id, address, amount] of test_case.expected_balances) {
+        let utxos = await fetchUTXOs(address, "Fuji-x", [asset_id]);
+        if (utxos === undefined) {
+            result += "Failed to get UTXOs of asset " + stringFromAssetID(asset_id) + " held by address " + stringFromAddress("Fuji-x", address);
+            return result 
+        } 
+        let actual_amount = getBalance(utxos, asset_id);
+        if (actual_amount.lt(amount)) {
+            result += "Invalid Balance of address " + stringFromAddress("Fuji-x", address) + ", expected " + amount.toJSON() + " but found " + actual_amount.toJSON(); 
+            return result
+        }
     }
-    return message
+    await deleteTrade(trade_id);
+    result += "PASSED";
+    return result
 }
 
-async function addTrade0(context: Context): Promise<Context> {
+async function getTradeStatus(trade_id: string): Promise<TradeStatus> {
     let params = {
-        "asset_id": context.nft_asset_id,
+        "trade_id": trade_id
+    }
+    let prep = await prepareReadTrade(params);
+    let api_trade = await readTrade(prep);
+    return api_trade.status
+}
+
+interface TestSuite {
+    supplier: KeyPair;
+    supplied_avax: BN;
+    supplied_ft: BN;
+    supplied_nfts: UTXO[];
+    test_cases: TestCase[];
+    txc: TxConstruction;
+}
+
+interface TestCase {
+    id: string;
+    trade_id: string;
+    expected_status: TradeStatus;
+    expected_balances: AssetAddressAmount[];
+}
+
+type AssetAddressAmount = [Buffer, Buffer, BN]
+
+function makeTestSuite(txc: TxConstruction): TestSuite {
+    return {
+        "supplier": makeKeyPair("Fuji-x", TEST_SUPPLIER_PRIVATE_KEY),
+        "supplied_avax": new BN(0),
+        "supplied_ft": new BN(0), 
+        "supplied_nfts": [],
+        "test_cases": [],
+        "txc": txc
+    }
+}
+
+function makeTestCase(id: string, trade_id: string, expected_status: TradeStatus, expected_balances?: AssetAddressAmount[]): TestCase {
+    return {
+        "id": id,
+        "trade_id": trade_id,
+        "expected_status": expected_status,
+        "expected_balances": (expected_balances === undefined) ? [] : expected_balances
+    }
+}
+
+function makeSinkAddressString(): string {
+    let key_pair = makeKeyPair("Fuji-x");
+    return key_pair.getAddressString()
+}
+
+async function generateTestSuite(): Promise<TestSuite> {
+    let txc = makeTxConstruction("Fuji-x", "Ava Trades Test Suite");
+    let test_suite = makeTestSuite(txc);
+    test_suite = await addSupplierResources(test_suite);
+    test_suite = await addTestCase_0(test_suite);
+    test_suite = await addTestCase_1(test_suite);
+    test_suite = await returnUnusedSupplierResources(test_suite);
+    return test_suite
+}
+
+async function addSupplierResources(test_suite: TestSuite): Promise<TestSuite> {
+    let supplier = test_suite.supplier.getAddress();
+    let avax_id = await getAvaxID("Fuji-x");
+    let ft_id = assetIdFromString(TEST_FT_ID);
+    let fungible_utxos = await fetchUTXOs(supplier, "Fuji-x", [avax_id, ft_id]);
+    let nft_utxos = await fetchUTXOs(supplier, "Fuji-x", [assetIdFromString(TEST_NFT_ID)]);
+    if (fungible_utxos === undefined || nft_utxos === undefined) {
+        throw "Add Supplier Resources - Failed te fetch supplier UTXOs"
+    }
+    test_suite.txc = addInputs(test_suite.txc, fungible_utxos);
+    test_suite.supplied_avax = getBalance(fungible_utxos, avax_id);
+    test_suite.supplied_ft = getBalance(fungible_utxos, ft_id);
+    test_suite.supplied_nfts = (nft_utxos === undefined) ? [] : nft_utxos;
+    return test_suite
+}
+
+async function returnUnusedSupplierResources(test_suite: TestSuite): Promise<TestSuite> {
+    let supplier_address = test_suite.supplier.getAddress();
+    test_suite = addFTTransfer(test_suite, supplier_address, test_suite.supplied_ft);
+    test_suite = await addAVAXTransfer(test_suite, supplier_address, test_suite.supplied_avax.sub(SERVICE_FEE));
+    return test_suite
+}
+
+function addNFTTransfer(test_suite: TestSuite, to_address: Buffer): TestSuite {
+    let utxo = test_suite.supplied_nfts.pop();
+    if (utxo === undefined) {
+        throw "Add NFT Transfer - Not enough NFTs"
+    }
+    test_suite.txc = addNFTTransferOp(test_suite.txc, utxo, to_address);
+    return test_suite
+}
+
+function addFTTransfer(test_suite: TestSuite, to_address: Buffer, amount: BN): TestSuite {
+    let ft_id = assetIdFromString(TEST_FT_ID);
+    test_suite.txc = addOutput(test_suite.txc, to_address, ft_id, amount);
+    test_suite.supplied_ft = test_suite.supplied_ft.sub(amount);
+    return test_suite
+}
+
+async function addAVAXTransfer(test_suite: TestSuite, to_address: Buffer, amount: BN): Promise<TestSuite> {
+    let avax_id = await getAvaxID("Fuji-x");
+    test_suite.txc = addOutput(test_suite.txc, to_address, avax_id, amount);
+    test_suite.supplied_ft = test_suite.supplied_ft.sub(amount);
+    return test_suite
+}
+
+async function sleep(ms: number) {
+    await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+
+
+
+//--------------------------TEST CASES ----------------------------------//
+async function addTestCase_0(test_suite: TestSuite): Promise<TestSuite> {
+    let params = {
+        "asset_id": TEST_NFT_ID,
         "ask": "10000000000",
         "allows_bidding": "true",
-        "address": TEST_SINK_ADDRESSES[0],
+        "address": TEST_SINK_ADDRESS,
         "chain": "Fuji-x"
     }
     let prep = prepareCreateTrade(params);
     let response = await createTrade(prep);
-    context.trade_ids.push(response.trade_id);
-    return context
+    let trade_id = response.trade_id;
+    let test_case = makeTestCase("0", trade_id, "PENDING");
+    test_suite.test_cases.push(test_case);
+    return test_suite
 }
 
-async function removeTrade0(context: Context): Promise<Context> {
+async function addTestCase_1(test_suite: TestSuite): Promise<TestSuite> {
     let params = {
-        "trade_id": context.trade_ids[0]
+        "asset_id": TEST_NFT_ID,
+        "ask": "10000000000",
+        "allows_bidding": "true",
+        "address": TEST_SINK_ADDRESS,
+        "chain": "Fuji-x"
     }
-    let prep = await prepareReadTrade(params);
-    let trade_1 = await readTrade(prep);
-    if (trade_1.status === "PENDING") {
-        await deleteTrade(trade_1.trade_id)
-        context.result[0] = true;
-    } 
-    return context
+    let prep = prepareCreateTrade(params);
+    let response = await createTrade(prep);
+    let wallet_address = addressFromString("Fuji-x", response.address);
+    test_suite = addNFTTransfer(test_suite, wallet_address);
+    let expected_balances: AssetAddressAmount = [assetIdFromString(TEST_NFT_ID), wallet_address, new BN(1)];
+    let test_case = makeTestCase("1", response.trade_id, "PENDING", [expected_balances]);
+    test_suite.test_cases.push(test_case);
+    return test_suite
 }
-
-async function addTrade1(context: Context): Promise<Context> {
-    let key = FUJI_NETWORK.XChain().keyChain().importKey(TEST_SUPPLIER_PRIVATE_KEY);
-    FUJI_NETWORK.XChain().keyChain().addKey(key)
-    let txc = context.txc;
-    let supplier = addressFromString("Fuji-x", TEST_SUPPLIER_ADDRESS);
-    let utxo_response = await FUJI_NETWORK.XChain().getUTXOs(stringFromAddress("Fuji-x", supplier));
-    let utxos = utxo_response.utxos.getAllUTXOs();
-    for (let u of utxos) {
-        if (u.getAssetID().equals(bintools.cb58Decode(FUJI_AVAX_ID))) {
-            txc = addInput(txc, u);
-        }
-    }
-    let avax_id = getAvaxID("Fuji-x");
-    let balance_after_fee = getBalance(utxos, avax_id).sub(new BN(1000000))
-    
-    let sink = addressFromString("Fuji-x", TEST_SINK_ADDRESSES[0]);
-    txc = addOutput(txc, supplier, avax_id, balance_after_fee)
-    txc = addNFTTransferOp(txc, utxos[200], sink);
-    let tx_id = await issue(txc);
-    console.log(tx_id);
-
-
-    return context
-}
-
-
-

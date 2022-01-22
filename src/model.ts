@@ -1,15 +1,20 @@
-import { BN, BinTools, Buffer } from "avalanche"
+import { BN, Buffer } from "avalanche"
 import { UTXO, KeyPair} from "avalanche/dist/apis/avm"
 import { v4 as uuid} from "uuid"
-import { FUJI_NETWORK, AVALANCHE_NETWORK, AVALANCHE_AVAX_ID, FUJI_AVAX_ID, SERVICE_FEE, FUJI_PROFIT_ADDRESS, AVALANCHE_PROFIT_ADDRESS } from "./constants"
-
-const bintools = BinTools.getInstance();
+import { SERVICE_FEE } from "./constants"
+import { 
+    Chain, 
+    getAvaxID,
+    makeKeyPair,
+    stringFromAddress, addressFromString, 
+    stringFromAssetID, assetIdFromString,
+    stringFromSignature, signatureFromString
+ } from "./common"
 
 
 type TradeMode = "FIXED" | "AUCTION";
 type TradeStatus = "PENDING" | "OPEN" | "CLOSED" | "EXPIRED" | "LOCKED";
 type WalletStatus = "OPEN" | "CLOSED" | "LOCKED"
-type Chain = "Avalanche-x" | "Fuji-x"
 
 interface Trade {
     id: string;
@@ -49,7 +54,7 @@ interface Wallet {
     status: WalletStatus;
 }
 
-function makeTrade(asset_id: Buffer, ask: BN, mode: TradeMode, proceeds_address: Buffer, chain: Chain): Trade {
+async function makeTrade(asset_id: Buffer, ask: BN, mode: TradeMode, proceeds_address: Buffer, chain: Chain): Promise<Trade> {
     let now = new Date().getTime();
     let two_days_from_now = now + 172800;
     let week_from_now = now + 604800;
@@ -58,7 +63,7 @@ function makeTrade(asset_id: Buffer, ask: BN, mode: TradeMode, proceeds_address:
         "ask": ask,
         "mode": mode,
         "proceeds_address": proceeds_address,
-        "wallet": makeWallet(chain, SERVICE_FEE, asset_id),
+        "wallet": await makeWallet(chain, SERVICE_FEE, asset_id),
         "deadline": (mode === "AUCTION") ? two_days_from_now : week_from_now,
         "status": "PENDING",
         "receipt": []
@@ -110,12 +115,12 @@ function itemAsTrade(item: any): Trade {
     }
 }
 
-function makeBid(trade: Trade, proceeds_address: Buffer): Bid {
+async function makeBid(trade: Trade, proceeds_address: Buffer): Promise<Bid> {
     let avax_requirement = trade.ask.divRound(10);
     return {
         "trade_id": trade.id,
         "proceeds_address": proceeds_address,
-        "wallet": makeWallet(trade.wallet.chain, avax_requirement)
+        "wallet": await makeWallet(trade.wallet.chain, avax_requirement)
     }
 }
 
@@ -196,15 +201,15 @@ function itemAsRoyalty(item: any): Royalty {
     }
 }
 
-function makeWallet(chain: Chain, avax_requirement: BN, asset_id?: Buffer): Wallet {
+async function makeWallet(chain: Chain, avax_requirement: BN, asset_id?: Buffer): Promise<Wallet> {
     let now = new Date().getTime();
-    let half_hour_from_now = now + 1800;
-    let avax_id = getAvaxID(chain);
+    let half_hour_from_now = now + 1800000;
+    let avax_id = await getAvaxID(chain);
     let asset_ids = [avax_id];
     if (asset_id !== undefined) {
         asset_ids.push(asset_id);
     }
-    let key_pair = getKeyPair(chain);
+    let key_pair = makeKeyPair(chain);
     let address = key_pair.getAddress();
     return {
         "chain": chain,
@@ -255,7 +260,7 @@ function itemAsWallet(obj: any): Wallet {
     }
     let avax_requirement = new BN(obj.avax_requirement["S"], 16);
     let chain: Chain = obj.chain["S"];
-    let key_pair = getKeyPair(chain, obj.private_key["S"]);
+    let key_pair = makeKeyPair(chain, obj.private_key["S"]);
     return {
         "chain": chain,
         "asset_ids": asset_ids,
@@ -268,60 +273,7 @@ function itemAsWallet(obj: any): Wallet {
     }
 }
 
-function getKeyPair(chain: Chain, private_key?: string): KeyPair {
-    let xchain = (chain === "Fuji-x") ? FUJI_NETWORK.XChain() : AVALANCHE_NETWORK.XChain();
-    let key_pair = xchain.keyChain().makeKey();
-    if (private_key !== undefined) {
-        let key_string = private_key.split("-")[1];
-        let key_buf = bintools.cb58Decode(key_string);
-        key_pair.importKey(key_buf);
-        xchain.keyChain().addKey(key_pair);
-    }
-    return key_pair
-}
-
-function getAvaxID(chain: Chain): Buffer {
-    let avax_id = (chain === "Fuji-x") ? FUJI_AVAX_ID : AVALANCHE_AVAX_ID;
-    return assetIdFromString(avax_id)
-}
-
-function getProfitAddress(chain: Chain): Buffer {
-    let address = (chain === "Fuji-x") ? FUJI_PROFIT_ADDRESS : AVALANCHE_PROFIT_ADDRESS;
-    return addressFromString(chain, address)
-}
-
-function stringFromAddress(chain: Chain, address: Buffer): string {
-    let network = (chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
-    return network.XChain().addressFromBuffer(address)
-}
-
-function addressFromString(chain: Chain, address: string): Buffer {
-    let network = (chain === "Fuji-x") ? FUJI_NETWORK : AVALANCHE_NETWORK;
-    return network.XChain().parseAddress(address)
-}
-
-function stringFromSignature(asset_id: Buffer): string {
-    return bintools.cb58Encode(asset_id)
-}
-
-function signatureFromString(asset_id: string): Buffer {
-    return bintools.cb58Decode(asset_id)
-}
-
-function stringFromAssetID(asset_id: Buffer): string {
-    return bintools.cb58Encode(asset_id)
-}
-
-function assetIdFromString(asset_id: string): Buffer {
-    return bintools.cb58Decode(asset_id)
-}
-
-
-
-
-export { Trade, Bid, Royalty, Wallet, Chain, TradeMode, TradeStatus }
+export { Trade, Bid, Royalty, Wallet, TradeMode, TradeStatus }
 export { makeTrade, makeBid, makeRoyalty }
 export { tradeAsItem, bidAsItem, royaltyAsItem }
 export { itemAsTrade, itemAsBid, itemAsRoyalty }
-export { stringFromAddress, stringFromAssetID, addressFromString, assetIdFromString, signatureFromString, stringFromSignature }
-export { getProfitAddress, getAvaxID }

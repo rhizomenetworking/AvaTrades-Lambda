@@ -1,4 +1,6 @@
 import { LIVE_DATABASE_NAME, TEST_DATABASE_NAME, JOB } from "./constants"
+import { Buffer } from "avalanche";
+import { Chain, stringFromAssetID } from "./common"
 import { 
     DynamoDBClient, 
     DeleteItemCommand, DeleteItemCommandInput,
@@ -7,14 +9,13 @@ import {
     QueryCommand, QueryCommandInput 
 } from "@aws-sdk/client-dynamodb"
 import { 
-    Trade, Bid, Royalty, Chain,
+    Trade, Bid, Royalty, 
     tradeAsItem, itemAsTrade,
     bidAsItem, itemAsBid, 
     royaltyAsItem, itemAsRoyalty
 } from "./model"
-import { Buffer, BinTools } from "avalanche";
 
-const bintools = BinTools.getInstance();
+
 const DATABASE_NAME = (JOB === "TEST") ? TEST_DATABASE_NAME : LIVE_DATABASE_NAME;
 const client = new DynamoDBClient({ region: "us-east-2" });
 type Page = "FIRST" | any
@@ -24,9 +25,9 @@ async function fetchLiveTrades(page: Page): Promise<[Trade[], Page | undefined]>
         "TableName": DATABASE_NAME,
         "KeyConditionExpression": "pk = :trade",
         "ExclusiveStartKey": (page === "FIRST" || page === undefined) ? undefined : page,
-        "FilterExpression": "properties.#S = PENDING or properties.#S = #O",
+        //"FilterExpression": "properties.#S = PENDING or properties.#S = #O", TODO
         "ExpressionAttributeValues": {":trade": {"S": "TRADE"}},
-        "ExpressionAttributeNames": {"#S": "status", "#O": "OPEN"}
+        //"ExpressionAttributeNames": {"#S": "status", "#O": "OPEN"} TODO
     }
     let command = new QueryCommand(input);
     let response = await client.send(command);
@@ -81,7 +82,7 @@ async function fetchRoyalty(chain: Chain, asset_id: Buffer): Promise<Royalty | u
         "TableName": DATABASE_NAME,
         "Key": {
             "pk": {"S": chain},
-            "sk": {"S": bintools.cb58Encode(asset_id)}
+            "sk": {"S": stringFromAssetID(asset_id)}
         }
     }
     let command = new GetItemCommand(input);

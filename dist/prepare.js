@@ -12,16 +12,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.prepareReadRoyalty = exports.prepareReadTrade = exports.prepareSetRoyalty = exports.prepareCreateBid = exports.prepareCreateTrade = void 0;
 const avalanche_1 = require("avalanche");
 const database_1 = require("./database");
-const model_1 = require("./model");
+const common_1 = require("./common");
 function prepareCreateTrade(params) {
     //TODO: Verification
     let allows_bidding = Boolean(params.allows_bidding);
     let chain = params.chain;
     return {
-        "asset_id": (0, model_1.assetIdFromString)(params.asset_id),
+        "asset_id": (0, common_1.assetIdFromString)(params.asset_id),
         "ask": new avalanche_1.BN(params.ask),
         "mode": allows_bidding ? "AUCTION" : "FIXED",
-        "proceeds_address": (0, model_1.addressFromString)(chain, params.address),
+        "proceeds_address": (0, common_1.addressFromString)(chain, params.address),
         "chain": chain
     };
 }
@@ -35,7 +35,7 @@ function prepareCreateBid(params) {
         }
         return {
             "trade": trade,
-            "proceeds_address": (0, model_1.addressFromString)(trade.wallet.chain, params.proceeds_address)
+            "proceeds_address": (0, common_1.addressFromString)(trade.wallet.chain, params.proceeds_address)
         };
     });
 }
@@ -44,13 +44,13 @@ function prepareSetRoyalty(params) {
     //TODO
     let chain = params.chain;
     return {
-        "asset_id": (0, model_1.assetIdFromString)(params.asset_id),
-        "proceeds_address": (0, model_1.addressFromString)(chain, params.proceeds_address),
+        "asset_id": (0, common_1.assetIdFromString)(params.asset_id),
+        "proceeds_address": (0, common_1.addressFromString)(chain, params.proceeds_address),
         "divisor": parseInt(params.divisor),
         "chain": chain,
         "timestamp": parseInt(params.timestamp),
-        "minter_address": (0, model_1.addressFromString)(chain, params.minter_address),
-        "minter_signature": (0, model_1.signatureFromString)(params.minter_signature),
+        "minter_address": (0, common_1.addressFromString)(chain, params.minter_address),
+        "minter_signature": (0, common_1.signatureFromString)(params.minter_signature),
     };
 }
 exports.prepareSetRoyalty = prepareSetRoyalty;
@@ -71,7 +71,7 @@ function prepareReadRoyalty(params) {
     return __awaiter(this, void 0, void 0, function* () {
         //TODO
         return {
-            "asset_id": (0, model_1.assetIdFromString)(params.asset_id),
+            "asset_id": (0, common_1.assetIdFromString)(params.asset_id),
             "chain": params.chain
         };
     });

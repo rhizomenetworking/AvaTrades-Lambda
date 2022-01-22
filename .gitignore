@@ -2,3 +2,4 @@ node_modules/*
 upload.sh
 src/secrets.ts
 dist/secrets.js
+Archive.zip

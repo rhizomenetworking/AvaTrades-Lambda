@@ -13,30 +13,18 @@ const constants_1 = require("./constants");
 const monitor_1 = require("./monitor");
 const service_1 = require("./service");
 const test_1 = require("./test");
-exports.handler = function (event, context, callback) {
+exports.handler = function (event) {
     return __awaiter(this, void 0, void 0, function* () {
         if (constants_1.JOB === "MONITOR") {
             yield (0, monitor_1.runMonitor)();
         }
         else if (constants_1.JOB === "SERVER") {
-            try {
-                let response = yield (0, service_1.serve)(event);
-                callback(null, response);
-            }
-            catch (err) {
-                //TODO: hide error from user
-                callback(err, null);
-            }
+            let response = yield (0, service_1.serve)(event);
+            return response;
         }
         else if (constants_1.JOB === "TEST") {
-            try {
-                let response = yield (0, test_1.runTest)();
-                callback(null, response);
-            }
-            catch (err) {
-                console.log(err);
-                callback(err, null);
-            }
+            let response = yield (0, test_1.runTestSuite)();
+            return response;
         }
     });
 };

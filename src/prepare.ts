@@ -1,6 +1,7 @@
 import { BN, Buffer } from "avalanche"
 import { fetchTrade } from "./database"
-import { Trade, Chain, TradeMode, assetIdFromString, addressFromString, signatureFromString } from "./model"
+import { Trade, TradeMode } from "./model"
+import { Chain, assetIdFromString, addressFromString, signatureFromString } from "./common"
 
 interface PreparedCreateTrade {
     asset_id: Buffer;

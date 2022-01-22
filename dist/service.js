@@ -14,6 +14,7 @@ const database_1 = require("./database");
 const model_1 = require("./model");
 const prepare_1 = require("./prepare");
 const api_contract_1 = require("./api_contract");
+//TODO: Add Helpful error messages
 function serve(event) {
     return __awaiter(this, void 0, void 0, function* () {
         let params = event.queryStringParameters;
@@ -54,7 +55,7 @@ function serve(event) {
 exports.serve = serve;
 function createTrade(prep) {
     return __awaiter(this, void 0, void 0, function* () {
-        let new_trade = (0, model_1.makeTrade)(prep.asset_id, prep.ask, prep.mode, prep.proceeds_address, prep.chain);
+        let new_trade = yield (0, model_1.makeTrade)(prep.asset_id, prep.ask, prep.mode, prep.proceeds_address, prep.chain);
         yield (0, database_1.putTrade)(new_trade);
         return (0, api_contract_1.makeAPIWallet)(new_trade);
     });
@@ -63,7 +64,7 @@ exports.createTrade = createTrade;
 function createBid(prep) {
     return __awaiter(this, void 0, void 0, function* () {
         let trade = prep.trade;
-        let new_bid = (0, model_1.makeBid)(trade, prep.proceeds_address);
+        let new_bid = yield (0, model_1.makeBid)(trade, prep.proceeds_address);
         yield (0, database_1.putBid)(new_bid);
         return (0, api_contract_1.makeAPIWallet)(trade, new_bid);
     });
