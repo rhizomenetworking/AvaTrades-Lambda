@@ -80,7 +80,7 @@ function itemAsTrade(item) {
 exports.itemAsTrade = itemAsTrade;
 function makeBid(trade, proceeds_address) {
     return __awaiter(this, void 0, void 0, function* () {
-        let avax_requirement = trade.ask.divRound(10);
+        let avax_requirement = trade.ask.divRound(new avalanche_1.BN(10));
         return {
             "trade_id": trade.id,
             "proceeds_address": proceeds_address,
@@ -110,7 +110,7 @@ function itemAsBid(item) {
     let wallet = itemAsWallet(properties.wallet["M"]);
     let proceeds_address = (0, common_1.addressFromString)(wallet.chain, properties.proceeds_address["S"]);
     return {
-        "trade_id": properties.id["S"],
+        "trade_id": properties.trade_id["S"],
         "proceeds_address": proceeds_address,
         "wallet": wallet
     };

@@ -31,7 +31,6 @@ async function syncWallet(wallet: Wallet): Promise<Wallet> {
         return wallet
     }
     let utxos = await fetchUTXOs(wallet.address, wallet.chain, wallet.asset_ids, wallet.asset_ids.length);
-    console.log(utxos)
     if (utxos === undefined) {
         wallet.status = "LOCKED";
         return wallet
@@ -63,7 +62,7 @@ async function fetchUTXOs(address: Buffer, chain: Chain, asset_ids: Buffer[], li
     let address_string = stringFromAddress(chain, address);
     let response = await xchain.getUTXOs(address_string);
     let utxos = response.utxos.getAllUTXOs();
-    if (utxos.length >= limit) {
+    if (utxos.length > limit) {
         return undefined
     }
     let result: UTXO[] = [];

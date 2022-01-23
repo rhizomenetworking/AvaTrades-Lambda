@@ -1,31 +1,26 @@
 "use strict";
 /*
 OUTCOME: Pending Trade
-1) Pending Auction whoose wallet is not expired
+1) Pending Trade whoose wallet is not expired
 
 OUTCOME: Locked Trade
-1) Pending Auction whoose wallet is not expired, but has recieved too many UTXOs
-2) Pending Auction whoose wallet is expired, but only lacking asset
-3) Pending Auction whoose wallet is expired, but only lacking service fee
-4) Pending Auction whoose wallet is expired, but lacking both NFT and service fee
+1) Pending Trade whoose wallet is not expired, but has recieved too many UTXOs
+2) Pending Trade whoose wallet is expired, but only lacking asset
+3) Pending Trade whoose wallet is expired, but only lacking service fee
+4) Pending Trade whoose wallet is expired, but lacking both NFT and service fee
 
 OUTCOME: Open Trade
-) Pending Auction has service fee + one NFT
-) Pending Auction has service fee + many NFTs
-) Pending Auction has service fee + one FT
-) Pending Auction has service fee + many FT
-) Open Auction has no bids, but has not expired
-) Open Auction has bids above ask, but has not expired
-) Open Fixed has bids below ask, but has not expired
+1) Pending Trade whoose wallet is expired, and has recieved both service fee and asset
+2) Open Trade that has no bids, and has yet to expire
+3) Open Auction has a closed bid of ask, but has yet to expire
+4) Open Fixed has a closed bid below ask, but has yet to expired
 
 OUTCOME: Expired Trade
-) Open Auction has expired with zero bids
-) Open Auction has expired with many bids below ask
+) Open Trade has expired with no bids above ask.
 
 OUTCOME: Closed Trade
-) Open Auction has expired with many locked, open, and closed bids above ask
-) Open Fixed has expired with exactly one bid at ask price, but seller needs change
-) Open Fixed has expired with exactly one bid above ask price and royalty
+) Open Auction has expired with closed bids above ask
+) Open Fixed has closed bids at and above ask price, seller needs change, royalty exists
 
 */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
@@ -48,21 +43,12 @@ const tx_construction_1 = require("./tx_construction");
 const secrets_1 = require("./secrets");
 const constants_1 = require("./constants");
 const blockchain_1 = require("./blockchain");
+const model_1 = require("./model");
 const common_1 = require("./common");
 function runTestSuite() {
     return __awaiter(this, void 0, void 0, function* () {
-        console.log("Generating Test Suite ...");
         let test_suite = yield generateTestSuite();
-        console.log("Issuing Transaction ...");
-        let tx_id = yield (0, tx_construction_1.issue)(test_suite.txc);
-        console.log("Sleeping ...");
-        yield sleep(3000);
-        console.log("Running Monitor ...");
-        yield (0, monitor_1.runMonitor)();
-        console.log("Sleeping ...");
-        yield sleep(1000);
-        console.log("Running Test Cases ...");
-        let report = "Test Suite Report --- " + tx_id + "\n\n";
+        let report = "Test Suite Report --- " + test_suite.tx_id + "\n\n";
         for (let test_case of test_suite.test_cases) {
             console.log("Running Test Case " + test_case.id + " ...");
             let result = yield runTestCase(test_case);
@@ -76,6 +62,25 @@ function runTestSuite() {
     });
 }
 exports.runTestSuite = runTestSuite;
+function generateTestSuite() {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log("Generating Test Suite ...");
+        let test_suite = makeTestSuite();
+        console.log("Adding Supplier Resources ...");
+        test_suite = yield addSupplierResources(test_suite);
+        for (let addTestCase of ADD_TEST_CASES) {
+            test_suite = yield addTestCase(test_suite);
+        }
+        test_suite = yield returnUnusedSupplierResources(test_suite);
+        console.log("Issuing Transaction ...");
+        test_suite.tx_id = yield (0, tx_construction_1.issue)(test_suite.txc);
+        console.log("Running Monitor ...");
+        yield sleep(3000);
+        yield (0, monitor_1.runMonitor)();
+        yield sleep(1000);
+        return test_suite;
+    });
+}
 function runTestCase(test_case) {
     return __awaiter(this, void 0, void 0, function* () {
         let trade_id = test_case.trade_id;
@@ -123,14 +128,30 @@ function expireTradeWallet(trade_id) {
         yield (0, database_1.putTrade)(trade);
     });
 }
-function makeTestSuite(txc) {
+function expireTrade(trade_id) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let trade = yield (0, database_1.fetchTrade)(trade_id);
+        if (trade === undefined) {
+            throw "Expire Trade - Trade Not Found";
+        }
+        trade.deadline = 0;
+        yield (0, database_1.putTrade)(trade);
+    });
+}
+function sleep(ms) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield new Promise(resolve => setTimeout(resolve, ms));
+    });
+}
+function makeTestSuite() {
     return {
         "supplier": (0, common_1.makeKeyPair)("Fuji-x", secrets_1.TEST_SUPPLIER_PRIVATE_KEY),
         "supplied_avax": new avalanche_1.BN(0),
         "supplied_ft": new avalanche_1.BN(0),
         "supplied_nfts": [],
         "test_cases": [],
-        "txc": txc
+        "txc": (0, tx_construction_1.makeTxConstruction)("Fuji-x", "Ava Trades Test Suite"),
+        "tx_id": "<No Transaction ID>"
     };
 }
 function makeTestCase(id, trade_id, expected_status, expected_balances) {
@@ -140,22 +161,6 @@ function makeTestCase(id, trade_id, expected_status, expected_balances) {
         "expected_status": expected_status,
         "expected_balances": (expected_balances === undefined) ? [] : expected_balances
     };
-}
-function makeSinkAddressString() {
-    let key_pair = (0, common_1.makeKeyPair)("Fuji-x");
-    return key_pair.getAddressString();
-}
-function generateTestSuite() {
-    return __awaiter(this, void 0, void 0, function* () {
-        let txc = (0, tx_construction_1.makeTxConstruction)("Fuji-x", "Ava Trades Test Suite");
-        let test_suite = makeTestSuite(txc);
-        test_suite = yield addSupplierResources(test_suite);
-        for (let addTestCase of ADD_TEST_CASES) {
-            test_suite = yield addTestCase(test_suite);
-        }
-        test_suite = yield returnUnusedSupplierResources(test_suite);
-        return test_suite;
-    });
 }
 function addSupplierResources(test_suite) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -204,17 +209,16 @@ function addAVAXTransfer(test_suite, to_address, amount) {
         return test_suite;
     });
 }
-function sleep(ms) {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield new Promise(resolve => setTimeout(resolve, ms));
-    });
-}
 const ADD_TEST_CASES = [
     addTestCase_P1,
     addTestCase_L1,
     addTestCase_L2,
     addTestCase_L3,
-    addTestCase_L4
+    addTestCase_L4,
+    addTestCase_O1,
+    addTestCase_O2,
+    addTestCase_O3,
+    addTestCase_O4,
 ];
 //--------------------------TEST CASES ----------------------------------//
 function addTestCase_P1(test_suite) {
@@ -322,3 +326,93 @@ function addTestCase_L4(test_suite) {
         return test_suite;
     });
 }
+function addTestCase_O1(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let params = {
+            "asset_id": constants_1.TEST_NFT_ID,
+            "ask": "10000000000",
+            "allows_bidding": "true",
+            "address": constants_1.TEST_SUPPLIER_ADDRESS,
+            "chain": "Fuji-x"
+        };
+        let prep = (0, prepare_1.prepareCreateTrade)(params);
+        let response = yield (0, service_1.createTrade)(prep);
+        let wallet_address = (0, common_1.addressFromString)("Fuji-x", response.address);
+        let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
+        test_suite = yield addAVAXTransfer(test_suite, wallet_address, constants_1.SERVICE_FEE);
+        test_suite = addNFTTransfer(test_suite, wallet_address);
+        let expected_balances = [
+            [avax_id, wallet_address, constants_1.SERVICE_FEE],
+            [(0, common_1.assetIdFromString)(constants_1.TEST_NFT_ID), wallet_address, new avalanche_1.BN(1)]
+        ];
+        yield expireTradeWallet(response.trade_id);
+        let test_case = makeTestCase("O1", response.trade_id, "OPEN", expected_balances);
+        test_suite.test_cases.push(test_case);
+        return test_suite;
+    });
+}
+function addTestCase_O2(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let asset_id = (0, common_1.assetIdFromString)(constants_1.TEST_FT_ID);
+        let proceeds_address = (0, common_1.addressFromString)("Fuji-x", constants_1.TEST_SUPPLIER_ADDRESS);
+        let trade = yield (0, model_1.makeTrade)(asset_id, new avalanche_1.BN(1000000000), "AUCTION", proceeds_address, "Fuji-x");
+        trade.status = "OPEN";
+        yield (0, database_1.putTrade)(trade);
+        let test_case = makeTestCase("O2", trade.id, "OPEN");
+        test_suite.test_cases.push(test_case);
+        return test_suite;
+    });
+}
+function addTestCase_O3(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let ask = new avalanche_1.BN(10000000);
+        let asset_id = (0, common_1.assetIdFromString)(constants_1.TEST_FT_ID);
+        let proceeds_address = (0, common_1.addressFromString)("Fuji-x", constants_1.TEST_SUPPLIER_ADDRESS);
+        let trade = yield (0, model_1.makeTrade)(asset_id, ask, "AUCTION", proceeds_address, "Fuji-x");
+        trade.status = "OPEN";
+        yield (0, database_1.putTrade)(trade);
+        let bid_prep = yield (0, prepare_1.prepareCreateBid)({
+            "trade_id": trade.id,
+            "proceeds_address": constants_1.TEST_SUPPLIER_ADDRESS
+        });
+        let bid = yield (0, service_1.createBid)(bid_prep);
+        let bid_address = (0, common_1.addressFromString)("Fuji-x", bid.address);
+        let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
+        test_suite = yield addAVAXTransfer(test_suite, bid_address, ask);
+        let expected_balances = [
+            [avax_id, bid_address, ask],
+        ];
+        let test_case = makeTestCase("O3", trade.id, "OPEN", expected_balances);
+        test_suite.test_cases.push(test_case);
+        return test_suite;
+    });
+}
+function addTestCase_O4(test_suite) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let ask = new avalanche_1.BN(10000000);
+        let asset_id = (0, common_1.assetIdFromString)(constants_1.TEST_FT_ID);
+        let proceeds_address = (0, common_1.addressFromString)("Fuji-x", constants_1.TEST_SUPPLIER_ADDRESS);
+        let trade = yield (0, model_1.makeTrade)(asset_id, ask, "FIXED", proceeds_address, "Fuji-x");
+        trade.status = "OPEN";
+        yield (0, database_1.putTrade)(trade);
+        let bid_prep = yield (0, prepare_1.prepareCreateBid)({
+            "trade_id": trade.id,
+            "proceeds_address": constants_1.TEST_SUPPLIER_ADDRESS
+        });
+        let bid = yield (0, service_1.createBid)(bid_prep);
+        let bid_address = (0, common_1.addressFromString)("Fuji-x", bid.address);
+        let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
+        let bid_amount = ask.sub(new avalanche_1.BN(1));
+        test_suite = yield addAVAXTransfer(test_suite, bid_address, bid_amount);
+        let expected_balances = [
+            [avax_id, bid_address, bid_amount],
+        ];
+        let test_case = makeTestCase("O4", trade.id, "OPEN", expected_balances);
+        test_suite.test_cases.push(test_case);
+        return test_suite;
+    });
+}
+//TODO:
+//Add delete bid
+//remaining Test cases
+//fix TxConstruction to handle Nft-less transactions

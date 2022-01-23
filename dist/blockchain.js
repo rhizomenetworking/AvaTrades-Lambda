@@ -47,7 +47,6 @@ function syncWallet(wallet) {
             return wallet;
         }
         let utxos = yield fetchUTXOs(wallet.address, wallet.chain, wallet.asset_ids, wallet.asset_ids.length);
-        console.log(utxos);
         if (utxos === undefined) {
             wallet.status = "LOCKED";
             return wallet;
@@ -81,7 +80,7 @@ function fetchUTXOs(address, chain, asset_ids, limit = 1024) {
         let address_string = (0, common_1.stringFromAddress)(chain, address);
         let response = yield xchain.getUTXOs(address_string);
         let utxos = response.utxos.getAllUTXOs();
-        if (utxos.length >= limit) {
+        if (utxos.length > limit) {
             return undefined;
         }
         let result = [];

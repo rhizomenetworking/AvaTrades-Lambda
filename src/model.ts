@@ -116,7 +116,7 @@ function itemAsTrade(item: any): Trade {
 }
 
 async function makeBid(trade: Trade, proceeds_address: Buffer): Promise<Bid> {
-    let avax_requirement = trade.ask.divRound(10);
+    let avax_requirement = trade.ask.divRound(new BN(10));
     return {
         "trade_id": trade.id,
         "proceeds_address": proceeds_address,
@@ -145,7 +145,7 @@ function itemAsBid(item: any): Bid {
     let wallet = itemAsWallet(properties.wallet["M"]);
     let proceeds_address = addressFromString(wallet.chain, properties.proceeds_address["S"]);
     return {
-        "trade_id": properties.id["S"], 
+        "trade_id": properties.trade_id["S"], 
         "proceeds_address": proceeds_address,
         "wallet": wallet
     }

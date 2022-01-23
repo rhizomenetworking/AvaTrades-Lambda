@@ -1,6 +1,6 @@
 import { LIVE_DATABASE_NAME, TEST_DATABASE_NAME, JOB } from "./constants"
 import { Buffer } from "avalanche";
-import { Chain, stringFromAssetID } from "./common"
+import { Chain, stringFromAssetID, stringFromAddress } from "./common"
 import { 
     DynamoDBClient, 
     DeleteItemCommand, DeleteItemCommandInput,
