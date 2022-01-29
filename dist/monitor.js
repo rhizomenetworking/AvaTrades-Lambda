@@ -10,8 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runMonitor = void 0;
-const blockchain_1 = require("./blockchain");
-const database_1 = require("./database");
+const blockchain_1 = require("./blockchain/blockchain");
+const database_1 = require("./database/database");
 function updateBids(trade) {
     return __awaiter(this, void 0, void 0, function* () {
         let bids = [];

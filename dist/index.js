@@ -9,10 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const constants_1 = require("./constants");
+const constants_1 = require("./shared/constants");
 const monitor_1 = require("./monitor");
 const service_1 = require("./service");
-const test_1 = require("./test");
+const blockchain_test_1 = require("./blockchain/blockchain_test");
 exports.handler = function (event) {
     return __awaiter(this, void 0, void 0, function* () {
         if (constants_1.JOB === "MONITOR") {
@@ -23,7 +23,7 @@ exports.handler = function (event) {
             return response;
         }
         else if (constants_1.JOB === "TEST") {
-            let response = yield (0, test_1.runTestSuite)();
+            let response = yield (0, blockchain_test_1.runBlockchainTestSuite)();
             return response;
         }
     });

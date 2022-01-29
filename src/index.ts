@@ -1,7 +1,7 @@
 import { JOB } from "./shared/constants"
 import { runMonitor } from "./monitor"
 import { serve } from "./service"
-import { runTestSuite } from "./test"
+import { runBlockchainTestSuite } from "./blockchain/blockchain_test";
 
 exports.handler = async function(event: any) {
     if (JOB === "MONITOR") {
@@ -10,7 +10,7 @@ exports.handler = async function(event: any) {
         let response = await serve(event);
         return response
     } else if (JOB === "TEST") {
-        let response = await runTestSuite();
+        let response = await runBlockchainTestSuite();
         return response
     }
 }

@@ -140,10 +140,10 @@ OUTCOME: Closed Trade
 // }
 
 // interface TestSuite {
-//     supplier: KeyPair;
-//     supplied_avax: BN;
-//     supplied_ft: BN;
-//     supplied_nfts: UTXO[];
+    // supplier: KeyPair;
+    // supplied_avax: BN;
+    // supplied_ft: BN;
+    // supplied_nfts: UTXO[];
 //     test_cases: TestCase[];
 //     txc: TxConstruction;
 //     tx_id: string;
