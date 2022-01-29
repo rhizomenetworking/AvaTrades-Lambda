@@ -1,6 +1,7 @@
-import { LIVE_DATABASE_NAME, TEST_DATABASE_NAME, JOB } from "./constants"
+import { LIVE_DATABASE_NAME, TEST_DATABASE_NAME, JOB } from "../shared/constants"
 import { Buffer } from "avalanche";
-import { Chain, stringFromAssetID, stringFromAddress } from "./common"
+import { Trade, Bid, Royalty } from "../shared/model"
+import { Chain, stringFromAssetID } from "../shared/utilities"
 import { 
     DynamoDBClient, 
     DeleteItemCommand, DeleteItemCommandInput,
@@ -9,11 +10,10 @@ import {
     QueryCommand, QueryCommandInput 
 } from "@aws-sdk/client-dynamodb"
 import { 
-    Trade, Bid, Royalty, 
-    tradeAsItem, itemAsTrade,
-    bidAsItem, itemAsBid, 
-    royaltyAsItem, itemAsRoyalty
-} from "./model"
+    itemAsTrade, tradeAsItem, 
+    itemAsBid, bidAsItem, 
+    itemAsRoyalty, royaltyAsItem 
+} from "./converter";
 
 
 const DATABASE_NAME = (JOB === "TEST") ? TEST_DATABASE_NAME : LIVE_DATABASE_NAME;

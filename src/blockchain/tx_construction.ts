@@ -1,11 +1,11 @@
 import { BinTools, BN, Buffer } from "avalanche";
-import { Chain, getAvaxID, getNetwork } from "./common";
-import { SERVICE_FEE } from "./constants";
+import { Chain, getAvaxID, getNetwork } from "../shared/utilities";
+import { SERVICE_FEE } from "../shared/constants";
 import { 
     UTXO, 
     OperationTx, UnsignedTx, 
     TransferableInput, TransferableOutput, TransferableOperation, 
-    SECPTransferInput, SECPTransferOutput, NFTTransferOutput, NFTTransferOperation
+    SECPTransferInput, SECPTransferOutput, NFTTransferOutput, NFTTransferOperation, BaseTx
 } from "avalanche/dist/apis/avm"
 
 const bintools = BinTools.getInstance();
@@ -80,15 +80,25 @@ async function issue(txc: TxConstruction): Promise<string> {
     let network = getNetwork(txc.chain);
     let xchain = network.XChain();
     let blockchain_id = xchain.getBlockchainID();
-    let op_tx = new OperationTx(
-        network.getNetworkID(), 
-        bintools.cb58Decode(blockchain_id), 
-        txc.outputs, 
-        txc.inputs, 
-        txc.memo, 
-        txc.ops)
-
-    let unsigned_tx = new UnsignedTx(op_tx);
+    let base_tx: BaseTx;
+    if (txc.ops.length === 0) {
+        base_tx = new BaseTx(
+            network.getNetworkID(),
+            bintools.cb58Decode(blockchain_id),
+            txc.outputs,
+            txc.inputs,
+            txc.memo
+        )
+    } else {
+        base_tx = new OperationTx(
+            network.getNetworkID(), 
+            bintools.cb58Decode(blockchain_id), 
+            txc.outputs, 
+            txc.inputs, 
+            txc.memo, 
+            txc.ops)
+    }
+    let unsigned_tx = new UnsignedTx(base_tx);
     let avax_id = await getAvaxID(txc.chain);
     let burn: BN = unsigned_tx.getBurn(avax_id);
     if (burn.gt(SERVICE_FEE)) {

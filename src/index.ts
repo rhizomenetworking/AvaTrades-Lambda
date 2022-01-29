@@ -1,4 +1,4 @@
-import { JOB } from "./constants"
+import { JOB } from "./shared/constants"
 import { runMonitor } from "./monitor"
 import { serve } from "./service"
 import { runTestSuite } from "./test"

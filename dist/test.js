@@ -138,6 +138,15 @@ function expireTrade(trade_id) {
         yield (0, database_1.putTrade)(trade);
     });
 }
+function expireBids(trade) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let [bids, _] = yield (0, database_1.fetchBids)(trade, "FIRST");
+        for (let bid of bids) {
+            bid.wallet.expiration = 0;
+            yield (0, database_1.putBid)(bid);
+        }
+    });
+}
 function sleep(ms) {
     return __awaiter(this, void 0, void 0, function* () {
         yield new Promise(resolve => setTimeout(resolve, ms));
@@ -218,7 +227,7 @@ const ADD_TEST_CASES = [
     addTestCase_O1,
     addTestCase_O2,
     addTestCase_O3,
-    addTestCase_O4,
+    addTestCase_O4
 ];
 //--------------------------TEST CASES ----------------------------------//
 function addTestCase_P1(test_suite) {
@@ -376,6 +385,7 @@ function addTestCase_O3(test_suite) {
             "proceeds_address": constants_1.TEST_SUPPLIER_ADDRESS
         });
         let bid = yield (0, service_1.createBid)(bid_prep);
+        yield expireBids(trade);
         let bid_address = (0, common_1.addressFromString)("Fuji-x", bid.address);
         let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
         test_suite = yield addAVAXTransfer(test_suite, bid_address, ask);
@@ -400,6 +410,7 @@ function addTestCase_O4(test_suite) {
             "proceeds_address": constants_1.TEST_SUPPLIER_ADDRESS
         });
         let bid = yield (0, service_1.createBid)(bid_prep);
+        yield expireBids(trade);
         let bid_address = (0, common_1.addressFromString)("Fuji-x", bid.address);
         let avax_id = yield (0, common_1.getAvaxID)("Fuji-x");
         let bid_amount = ask.sub(new avalanche_1.BN(1));
@@ -415,4 +426,3 @@ function addTestCase_O4(test_suite) {
 //TODO:
 //Add delete bid
 //remaining Test cases
-//fix TxConstruction to handle Nft-less transactions

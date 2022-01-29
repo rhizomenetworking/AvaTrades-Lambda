@@ -1,10 +1,10 @@
-import { syncTrade, syncBid } from "./blockchain";
-import { Trade, Bid } from "./model";
+import { syncTrade, syncBid } from "./blockchain/blockchain";
+import { Trade, Bid } from "./shared/model";
 import { 
     Page, 
     fetchLiveTrades, fetchBids, fetchRoyalty, 
     putTrade, putBid 
-} from "./database";
+} from "./database/database";
 
 
 async function updateBids(trade: Trade): Promise<Bid[]> {

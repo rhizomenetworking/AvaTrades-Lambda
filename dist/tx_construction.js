@@ -77,8 +77,14 @@ function issue(txc) {
         let network = (0, common_1.getNetwork)(txc.chain);
         let xchain = network.XChain();
         let blockchain_id = xchain.getBlockchainID();
-        let op_tx = new avm_1.OperationTx(network.getNetworkID(), bintools.cb58Decode(blockchain_id), txc.outputs, txc.inputs, txc.memo, txc.ops);
-        let unsigned_tx = new avm_1.UnsignedTx(op_tx);
+        let base_tx;
+        if (txc.ops.length === 0) {
+            base_tx = new avm_1.BaseTx(network.getNetworkID(), bintools.cb58Decode(blockchain_id), txc.outputs, txc.inputs, txc.memo);
+        }
+        else {
+            base_tx = new avm_1.OperationTx(network.getNetworkID(), bintools.cb58Decode(blockchain_id), txc.outputs, txc.inputs, txc.memo, txc.ops);
+        }
+        let unsigned_tx = new avm_1.UnsignedTx(base_tx);
         let avax_id = yield (0, common_1.getAvaxID)(txc.chain);
         let burn = unsigned_tx.getBurn(avax_id);
         if (burn.gt(constants_1.SERVICE_FEE)) {

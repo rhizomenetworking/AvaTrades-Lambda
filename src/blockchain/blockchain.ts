@@ -1,7 +1,7 @@
 import { BN, Buffer } from "avalanche";
-import { Chain, getNetwork, stringFromAddress, getAvaxID, getProfitAddress } from "./common"
-import { Trade, Bid, Royalty, Wallet } from "./model";
-import { SERVICE_FEE } from "./constants";
+import { Chain, getNetwork, stringFromAddress, getAvaxID, getProfitAddress } from "../shared/utilities"
+import { Trade, Bid, Royalty, Wallet } from "../shared/model";
+import { SERVICE_FEE } from "../shared/constants";
 import { TxConstruction, makeTxConstruction, addInput, addInputs, addOutput, addNFTTransferOp, issue } from "./tx_construction";
 import { UTXO, SECPTransferOutput, NFTTransferOutput } from "avalanche/dist/apis/avm"
 

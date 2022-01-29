@@ -1,6 +1,5 @@
-import { Trade, Bid, Royalty, TradeStatus } from "./model"
-import { stringFromAddress, stringFromAssetID } from "./common"
-
+import { Trade, Bid, Royalty, TradeStatus } from "../shared/model"
+import { stringFromAddress, stringFromAssetID } from "../shared/utilities"
 
 interface APIMessage {
     message: string;

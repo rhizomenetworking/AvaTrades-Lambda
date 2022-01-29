@@ -1,7 +1,7 @@
 import { BN, Buffer } from "avalanche"
-import { fetchTrade } from "./database"
-import { Trade, TradeMode } from "./model"
-import { Chain, assetIdFromString, addressFromString, signatureFromString } from "./common"
+import { fetchTrade } from "../database/database"
+import { Trade, TradeMode } from "../shared/model"
+import { Chain, assetIdFromString, addressFromString, signatureFromString } from "../shared/utilities"
 
 interface PreparedCreateTrade {
     asset_id: Buffer;
@@ -93,5 +93,4 @@ async function prepareReadRoyalty(params: any): Promise<PreparedReadRoyalty> {
     }
 }
 
-export { PreparedCreateTrade, PreparedCreateBid, PreparedSetRoyalty, PreparedReadTrade, PreparedReadRoyalty }
 export { prepareCreateTrade, prepareCreateBid, prepareSetRoyalty, prepareReadTrade, prepareReadRoyalty }
