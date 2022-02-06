@@ -12,7 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.issue = exports.addNFTTransferOp = exports.addOutput = exports.addInputs = exports.addInput = exports.makeTxConstruction = void 0;
 const avalanche_1 = require("avalanche");
 const utilities_1 = require("../shared/utilities");
-const constants_1 = require("../shared/constants");
 const avm_1 = require("avalanche/dist/apis/avm");
 const bintools = avalanche_1.BinTools.getInstance();
 function makeTxConstruction(chain, memo) {
@@ -49,8 +48,7 @@ function addInput(txc, utxo) {
     let amount = output.getAmount();
     let transfer_input = new avm_1.SECPTransferInput(amount);
     let spender = output.getAddress(0);
-    let idx = addSigner(txc.signers, spender);
-    transfer_input.addSignatureIdx(idx, spender);
+    transfer_input.addSignatureIdx(0, spender);
     let transferable_input = new avm_1.TransferableInput(tx_id, output_index, asset_id, transfer_input);
     txc.inputs.push(transferable_input);
     return txc;
@@ -65,8 +63,7 @@ function addNFTTransferOp(txc, utxo, to_address) {
     let output = new avm_1.NFTTransferOutput(group_id, payload, [to_address]);
     let op = new avm_1.NFTTransferOperation(output);
     let spender = old_output.getAddress(0);
-    let idx = addSigner(txc.signers, spender);
-    op.addSignatureIdx(idx, spender);
+    op.addSignatureIdx(0, spender);
     let transferable_op = new avm_1.TransferableOperation(asset_id, [utxo_id], op);
     txc.ops.push(transferable_op);
     return txc;
@@ -87,8 +84,9 @@ function issue(txc) {
         let unsigned_tx = new avm_1.UnsignedTx(base_tx);
         let avax_id = yield (0, utilities_1.getAvaxID)(txc.chain);
         let burn = unsigned_tx.getBurn(avax_id);
-        if (burn.gt(constants_1.SERVICE_FEE)) {
-            throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds service fee";
+        let fee = xchain.getTxFee();
+        if (burn.gt(fee)) {
+            throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds network fee";
         }
         let key_chain = xchain.keyChain();
         let signed_tx = unsigned_tx.sign(key_chain);
@@ -97,12 +95,3 @@ function issue(txc) {
     });
 }
 exports.issue = issue;
-function addSigner(signers, address) {
-    for (let [idx, signer] of signers.entries()) {
-        if (signer.equals(address)) {
-            return idx;
-        }
-    }
-    let length = signers.push(address);
-    return length - 1;
-}

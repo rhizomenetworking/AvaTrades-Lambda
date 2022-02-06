@@ -209,6 +209,9 @@ function makeBidders(trade, bids) {
                     losing_bidders.push(highest_bidder);
                     highest_bidder = bidder;
                 }
+                else {
+                    losing_bidders.push(bidder);
+                }
             }
         }
         return [highest_bidder, losing_bidders];
@@ -260,6 +263,11 @@ function exchange(txc, trade, bidder, royalty) {
         for (let utxo of trade.wallet.utxos) {
             let output = utxo.getOutput();
             if (output instanceof avm_1.SECPTransferOutput) {
+                let asset_id = utxo.getAssetID();
+                if (!asset_id.equals(avax_id)) {
+                    let amount = output.getAmount();
+                    txc = (0, tx_construction_1.addOutput)(txc, client_address, asset_id, amount);
+                }
                 txc = (0, tx_construction_1.addInput)(txc, utxo);
             }
             else if (output instanceof avm_1.NFTTransferOutput) {

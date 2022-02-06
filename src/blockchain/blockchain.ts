@@ -1,5 +1,5 @@
 import { BN, Buffer } from "avalanche";
-import { Chain, getNetwork, stringFromAddress, getAvaxID, getProfitAddress } from "../shared/utilities"
+import { Chain, getNetwork, stringFromAddress, getAvaxID, getProfitAddress, stringFromAssetID } from "../shared/utilities"
 import { Trade, Bid, Royalty, Wallet } from "../shared/model";
 import { SERVICE_FEE } from "../shared/constants";
 import { TxConstruction, makeTxConstruction, addInput, addInputs, addOutput, addNFTTransferOp, issue } from "./tx_construction";
@@ -196,6 +196,8 @@ async function makeBidders(trade: Trade, bids: Bid[]): Promise<[Bidder | undefin
             if (bid_price.gt(high_price)) {
                 losing_bidders.push(highest_bidder);
                 highest_bidder = bidder;
+            } else {
+                losing_bidders.push(bidder)
             }
         }
     }
@@ -243,12 +245,17 @@ async function exchange(txc: TxConstruction, trade: Trade, bidder?: Bidder, roya
         }
         txc = addOutput(txc, trade.proceeds_address, avax_id, bid_price);
         txc = addInputs(txc, bidder.utxos);
-    }
+    } 
 
     let client_address = (bidder === undefined) ? trade.proceeds_address : bidder.address;
     for (let utxo of trade.wallet.utxos) {
         let output = utxo.getOutput();
         if (output instanceof SECPTransferOutput) {
+            let asset_id = utxo.getAssetID();
+            if (!asset_id.equals(avax_id)) {
+                let amount = output.getAmount();
+                txc = addOutput(txc, client_address, asset_id, amount);
+            }
             txc = addInput(txc, utxo);
         } else if (output instanceof NFTTransferOutput) {
             txc = addNFTTransferOp(txc, utxo, client_address);

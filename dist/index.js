@@ -24,7 +24,10 @@ exports.handler = function (event) {
         }
         else if (constants_1.JOB === "TEST") {
             let response = yield (0, blockchain_test_1.runBlockchainTestSuite)();
-            return response;
+            return {
+                "statusCode": 200,
+                "body": response
+            };
         }
     });
 };

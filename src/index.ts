@@ -11,6 +11,9 @@ exports.handler = async function(event: any) {
         return response
     } else if (JOB === "TEST") {
         let response = await runBlockchainTestSuite();
-        return response
+        return {
+            "statusCode": 200,
+            "body": response
+        }
     }
 }

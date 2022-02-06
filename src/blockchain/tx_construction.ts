@@ -1,6 +1,5 @@
 import { BinTools, BN, Buffer } from "avalanche";
 import { Chain, getAvaxID, getNetwork } from "../shared/utilities";
-import { SERVICE_FEE } from "../shared/constants";
 import { 
     UTXO, 
     OperationTx, UnsignedTx, 
@@ -53,8 +52,7 @@ function addInput(txc: TxConstruction, utxo: UTXO): TxConstruction {
     let amount = output.getAmount();
     let transfer_input = new SECPTransferInput(amount);
     let spender = output.getAddress(0);
-    let idx = addSigner(txc.signers, spender);
-    transfer_input.addSignatureIdx(idx, spender); 
+    transfer_input.addSignatureIdx(0, spender); 
     let transferable_input = new TransferableInput(tx_id, output_index, asset_id, transfer_input);
     txc.inputs.push(transferable_input);
     return txc
@@ -69,8 +67,7 @@ function addNFTTransferOp(txc: TxConstruction, utxo: UTXO, to_address: Buffer) {
     let output = new NFTTransferOutput(group_id, payload, [to_address]);
     let op = new NFTTransferOperation(output);
     let spender = old_output.getAddress(0);
-    let idx = addSigner(txc.signers, spender);
-    op.addSignatureIdx(idx, spender); 
+    op.addSignatureIdx(0, spender); 
     let transferable_op = new TransferableOperation(asset_id, [utxo_id], op);
     txc.ops.push(transferable_op);
     return txc
@@ -101,23 +98,14 @@ async function issue(txc: TxConstruction): Promise<string> {
     let unsigned_tx = new UnsignedTx(base_tx);
     let avax_id = await getAvaxID(txc.chain);
     let burn: BN = unsigned_tx.getBurn(avax_id);
-    if (burn.gt(SERVICE_FEE)) {
-        throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds service fee" 
+    let fee = xchain.getTxFee();
+    if (burn.gt(fee)) {
+        throw "TxConstruction - Burn of " + burn.toNumber().toString() + " nAVAX exceeds network fee" 
     }
     let key_chain = xchain.keyChain();
     let signed_tx = unsigned_tx.sign(key_chain);
     let tx_id = await xchain.issueTx(signed_tx);
     return tx_id
-}
-
-function addSigner(signers: Buffer[], address: Buffer): number {
-    for (let [idx, signer] of signers.entries()) {
-        if (signer.equals(address)) {
-            return idx
-        }
-    }
-    let length = signers.push(address);
-    return length - 1
 }
 
 export { TxConstruction, makeTxConstruction, addInput, addInputs, addOutput, addNFTTransferOp, issue }

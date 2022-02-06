@@ -13,8 +13,8 @@ export function makeKeyPair(chain: Chain, private_key?: string): KeyPair {
         let key_string = private_key.split("-")[1];
         let key_buf = bintools.cb58Decode(key_string);
         key_pair.importKey(key_buf);
-        xchain.keyChain().addKey(key_pair);
     }
+    xchain.keyChain().addKey(key_pair);
     return key_pair
 }
 
