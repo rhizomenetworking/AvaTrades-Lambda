@@ -1,5 +1,5 @@
 node_modules/*
 upload.sh
-src/secrets.ts
-dist/secrets.js
+src/shared/secrets.ts
+dist/shared/secrets.js
 Archive.zip
