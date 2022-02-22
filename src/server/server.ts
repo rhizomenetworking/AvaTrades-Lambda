@@ -12,8 +12,11 @@ import {
     makeAPITrade, makeAPIWallet, makeAPIRoyalty, makeAPIMessage, APIMessage
 } from "../server/api_contract"
 
-async function createTrade(params: any): Promise<APIWallet> {
-    let prep = prepareCreateTrade(params);
+async function createTrade(params: any): Promise<APIWallet | APIMessage> {
+    let prep = await prepareCreateTrade(params);
+    if (typeof prep === "string") {
+        return makeAPIMessage(prep)
+    }
     let new_trade = await makeTrade(
         prep.asset_id,
         prep.ask,
@@ -24,19 +27,26 @@ async function createTrade(params: any): Promise<APIWallet> {
     return makeAPIWallet(new_trade)
 }
 
-async function createBid(params: any): Promise<APIWallet> {
+async function createBid(params: any): Promise<APIWallet | APIMessage> {
     let prep = await prepareCreateBid(params);
+    if (typeof prep === "string") {
+        return makeAPIMessage(prep)
+    }
     let trade = prep.trade;
     let new_bid = await makeBid(trade, prep.proceeds_address);
     await putBid(new_bid);
     return makeAPIWallet(trade, new_bid)
 }
 
-async function setRoyalty(params: any): Promise<APIRoyalty> {
-    let prep = prepareSetRoyalty(params);
+async function setRoyalty(params: any): Promise<APIRoyalty | APIMessage> {
+    let prep = await prepareSetRoyalty(params);
+    if (typeof prep === "string") {
+        return makeAPIMessage(prep)
+    }
     let new_royalty = makeRoyalty(
         prep.asset_id,
         prep.proceeds_address,
+        prep.numerator,
         prep.divisor,
         prep.chain,
         prep.timestamp,
@@ -46,8 +56,11 @@ async function setRoyalty(params: any): Promise<APIRoyalty> {
     return makeAPIRoyalty(new_royalty) 
 }
 
-async function readTrade(params: any): Promise<APITrade> {
+async function readTrade(params: any): Promise<APITrade | APIMessage> {
     let prep = await prepareReadTrade(params);
+    if (typeof prep === "string") {
+        return makeAPIMessage(prep)
+    }
     let trade = prep.trade;
     let bids = await fetchBids(trade, "FIRST");
     let royalty = await fetchRoyalty(trade.wallet.chain, trade.wallet.asset_ids[1]) //TODO: find better way to get asset_id
@@ -56,6 +69,9 @@ async function readTrade(params: any): Promise<APITrade> {
 
 async function readRoyalty(params: any): Promise<APIRoyalty | APIMessage> {
     let prep = await prepareReadRoyalty(params);
+    if (typeof prep === "string") {
+        return makeAPIMessage(prep)
+    }
     let royalty = await fetchRoyalty(prep.chain, prep.asset_id);
     if (royalty === undefined) {
         return makeAPIMessage("Royalty does not yet exist for this asset.")

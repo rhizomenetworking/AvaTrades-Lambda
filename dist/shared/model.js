@@ -17,15 +17,15 @@ const utilities_1 = require("./utilities");
 function makeTrade(asset_id, ask, mode, proceeds_address, chain) {
     return __awaiter(this, void 0, void 0, function* () {
         let now = new Date().getTime();
-        let two_days_from_now = now + 172800;
-        let week_from_now = now + 604800;
+        let auction_deadline = now + constants_1.AUCTION_DURATION;
+        let fixed_deadline = now + constants_1.FIXED_DURATION;
         return {
             "id": (0, uuid_1.v4)(),
             "ask": ask,
             "mode": mode,
             "proceeds_address": proceeds_address,
             "wallet": yield makeWallet(chain, constants_1.SERVICE_FEE, asset_id),
-            "deadline": (mode === "AUCTION") ? two_days_from_now : week_from_now,
+            "deadline": (mode === "AUCTION") ? auction_deadline : fixed_deadline,
             "status": "PENDING",
             "receipt": []
         };
@@ -43,10 +43,11 @@ function makeBid(trade, proceeds_address) {
     });
 }
 exports.makeBid = makeBid;
-function makeRoyalty(asset_id, proceeds_address, divisor, chain, timestamp, minter_address, minter_signature) {
+function makeRoyalty(asset_id, proceeds_address, numerator, divisor, chain, timestamp, minter_address, minter_signature) {
     return {
         "asset_id": asset_id,
         "proceeds_address": proceeds_address,
+        "numerator": numerator,
         "divisor": divisor,
         "chain": chain,
         "timestamp": timestamp,
@@ -58,7 +59,7 @@ exports.makeRoyalty = makeRoyalty;
 function makeWallet(chain, avax_requirement, asset_id) {
     return __awaiter(this, void 0, void 0, function* () {
         let now = new Date().getTime();
-        let half_hour_from_now = now + 1800000;
+        let expiration = now + constants_1.WALLET_DURATION;
         let avax_id = yield (0, utilities_1.getAvaxID)(chain);
         let asset_ids = [avax_id];
         if (asset_id !== undefined) {
@@ -70,7 +71,7 @@ function makeWallet(chain, avax_requirement, asset_id) {
             "chain": chain,
             "asset_ids": asset_ids,
             "avax_requirement": avax_requirement,
-            "expiration": half_hour_from_now,
+            "expiration": expiration,
             "address": address,
             "private_key": key_pair,
             "utxos": [],

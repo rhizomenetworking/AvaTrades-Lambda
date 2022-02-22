@@ -1,6 +1,9 @@
 import { Avalanche, BN } from "avalanche";
 
 export const JOB: Job = "TEST"
+export const WALLET_DURATION: number = 900000;
+export const AUCTION_DURATION: number = 172800000; 
+export const FIXED_DURATION: number = 604800000; 
 export const SERVICE_FEE: BN = new BN(2000000);
 
 export const AVALANCHE_NETWORK = new Avalanche("api.avax.network", 443, "https", 1);

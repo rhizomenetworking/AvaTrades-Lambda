@@ -1,7 +1,10 @@
 import { BN, Buffer } from "avalanche"
 import { fetchTrade } from "../database/database"
+import { WALLET_DURATION } from "../shared/constants";
 import { Trade, TradeMode } from "../shared/model"
-import { Chain, assetIdFromString, addressFromString, signatureFromString } from "../shared/utilities"
+import { Chain, assetIdFromString, addressFromString, signatureFromString, getNetwork, makeKeyPair } from "../shared/utilities"
+
+type PreparationError = string
 
 interface PreparedCreateTrade {
     asset_id: Buffer;
@@ -19,7 +22,8 @@ interface PreparedCreateBid {
 interface PreparedSetRoyalty {
     asset_id: Buffer;
     proceeds_address: Buffer;
-    divisor: number;
+    numerator: BN;
+    divisor: BN;
     chain: Chain;
     timestamp: number;
     minter_address: Buffer;
@@ -35,62 +39,152 @@ interface PreparedReadRoyalty {
     asset_id: Buffer;
 }
 
-function prepareCreateTrade(params: any): PreparedCreateTrade {
-    //TODO: Verification
-    let allows_bidding = Boolean(params.allows_bidding);
-    let chain: Chain = params.chain;
+async function prepareCreateTrade(params: any): Promise<PreparedCreateTrade | PreparationError> {
+    let ask = paramAsBN(params.ask);
+    let MIN = new BN(1000);
+    if (ask === undefined || ask.lt(MIN)) {
+        return "Invalid ask"
+    }
+    let chain = paramAsChain(params.chain);
+    if (chain === undefined) {
+        return "Invalid chain"
+    }
+    let asset_id = await paramAsAssetID(params.listed_asset, chain);
+    if (asset_id === undefined) {
+        return "Invalid listed_asset"
+    }
+    let mode = paramAsTradeMode(params.mode);
+    if (mode === undefined) {
+        return "Invalid mode"
+    }
+    let proceeds_address = paramAsAddress(params.seller_address, chain);
+    if (proceeds_address === undefined) {
+        return "Invalid seller_address"
+    }
     return {
-        "asset_id": assetIdFromString(params.asset_id),
-        "ask": new BN(params.ask),
-        "mode": allows_bidding ? "AUCTION" : "FIXED",
-        "proceeds_address": addressFromString(chain, params.address),
+        "asset_id": asset_id,
+        "ask": ask,
+        "mode": mode,
+        "proceeds_address": proceeds_address,
         "chain": chain
     }
 }
 
-async function prepareCreateBid(params: any): Promise<PreparedCreateBid> {
-    //TODO
-    let trade = await fetchTrade(params.trade_id);
+async function prepareCreateBid(params: any): Promise<PreparedCreateBid | PreparationError> {
+    let trade = await paramAsTrade(params.trade_id);
     if (trade === undefined) {
-        throw "Create Bid - Trade not found"
+        return "Invalid trade_id"
+    }
+    let proceeds_address = paramAsAddress(params.bidder_address, trade.wallet.chain);
+    if (proceeds_address === undefined) {
+        return "Invalid bidder_address"
+    }
+    let now = new Date().getTime();
+    let buffer = 60000;
+    let time_needed = WALLET_DURATION + buffer;
+    if (trade.deadline < (now + time_needed)) {
+        return "This trade is no longer accepting new bids"
     }
     return {
         "trade": trade,
-        "proceeds_address": addressFromString(trade.wallet.chain, params.proceeds_address)
+        "proceeds_address": proceeds_address
     }
 }
 
-function prepareSetRoyalty(params: any): PreparedSetRoyalty {
-    //TODO
-    let chain: Chain = params.chain;
-    return {
-        "asset_id": assetIdFromString(params.asset_id), 
-        "proceeds_address": addressFromString(chain, params.proceeds_address),
-        "divisor": parseInt(params.divisor),
-        "chain": chain,
-        "timestamp": parseInt(params.timestamp),
-        "minter_address": addressFromString(chain, params.minter_address),
-        "minter_signature": signatureFromString(params.minter_signature),
-    }
-}
-
-async function prepareReadTrade(params: any): Promise<PreparedReadTrade> {
-    //TODO
-    let trade = await fetchTrade(params.trade_id);
+async function prepareReadTrade(params: any): Promise<PreparedReadTrade | PreparationError> {
+    let trade = await paramAsTrade(params.trade_id);
     if (trade === undefined) {
-        throw "Read Trade - Trade not found"
+        return "Invalid trade_id"
     }
     return {
         "trade": trade
     }
 }
 
-async function prepareReadRoyalty(params: any): Promise<PreparedReadRoyalty> {
-    //TODO
+async function prepareReadRoyalty(params: any): Promise<PreparedReadRoyalty | PreparationError> {
+    let chain = paramAsChain(params.chain);
+    if (chain === undefined) {
+        return "Invalid chain"
+    }
+    let asset_id = await paramAsAssetID(params.asset_id, chain);
+    if (asset_id === undefined) {
+        return "Invalid asset_id"
+    }
     return {
-        "asset_id": assetIdFromString(params.asset_id),
-        "chain": params.chain
+        "asset_id": asset_id,
+        "chain": chain
     }
 }
+
+async function prepareSetRoyalty(params: any): Promise<PreparedSetRoyalty | PreparationError> {
+    let chain = paramAsChain(params.chain);
+    if (chain === undefined) {
+        return "Invalid chain"
+    }
+    let asset_id = await paramAsAssetID(params.asset_id, chain);
+    if (asset_id === undefined) {
+        return "Invalid asset_id"
+    }
+    let MIN = new BN(0);
+    let MAX = new BN(10000);
+    let size = paramAsBN(params.royalty);
+    if (MIN.gte(size) || MAX.lte(size)) {
+        return "Invalid royalty"
+    }
+    let timestamp = paramAsNumber(params.timestamp);
+    if (timestamp === undefined) {
+        return "Invalid timestamp"
+    }
+    let now = new Date().getTime();
+    let diff = Math.abs(now - timestamp);
+    if (diff > 180000) {
+        return "Provided timestamp is too distant from current time"
+    }
+    let minter_address = await paramAsMinterAddress(params.proceeds_address, chain, asset_id);
+    if (minter_address === undefined) {
+        return "Invalid proceeds_address"
+    }
+    let minter_signature = paramAsSignature(params.signed_timestamp);
+    if (minter_signature === undefined) {
+        return "Invalid signed_timestamp"
+    }
+    let message = Buffer.from(timestamp.toString());
+    let actual_signer = makeKeyPair(chain).recover(message, minter_signature);
+    if (!actual_signer.equals(minter_address)) {
+        "signed_timestamp is not signed by proceeds_address"
+    }
+    return {
+        "asset_id": asset_id,
+        "proceeds_address": minter_address,
+        "numerator": size,
+        "divisor": MAX,
+        "chain": chain,
+        "timestamp": timestamp,
+        "minter_address": minter_address,
+        "minter_signature": minter_signature,
+    }
+}
+
+function paramAsChain(param: string): Chain | undefined {
+    if (param === "Fuji-X") {
+        return "Fuji-x"
+    } else if (param === "Avalanche-x") {
+        return "Avalanche-x"
+    }
+    return undefined
+}
+
+
+
+//TODO
+async function paramAsAssetID(param: string, chain: Chain): Promise<Buffer | undefined> { return {} as any } //TODO verify asset exists on chain
+function paramAsAddress(param: string, chain: Chain): Buffer | undefined { return {} as any } //TODO: ensure that it is not one of the profit addresses
+function paramAsBN(param: string): BN | undefined { return {} as any } //TODO: first convert to a number
+async function paramAsTrade(param: string): Promise<Trade | undefined> { return {} as any } 
+function paramAsTradeMode(param: string): TradeMode | undefined { return {} as any }
+function paramAsNumber(param: string): number | undefined { return {} as any }
+function paramAsSignature(param: string): Buffer | undefined { return {} as any }
+async function paramAsMinterAddress(param: string, chain: Chain, asset_id: Buffer): Promise<Buffer | undefined> { return {} as any } 
+
 
 export { prepareCreateTrade, prepareCreateBid, prepareSetRoyalty, prepareReadTrade, prepareReadRoyalty }

@@ -14,6 +14,21 @@ const server_1 = require("./server/server");
 //TODO: Add Helpful error messages
 function serve(event) {
     return __awaiter(this, void 0, void 0, function* () {
+        try {
+            return _serve(event);
+        }
+        catch (err) {
+            console.error(err);
+            return {
+                'statusCode': 500,
+                'body': "Internal Server Error"
+            };
+        }
+    });
+}
+exports.serve = serve;
+function _serve(event) {
+    return __awaiter(this, void 0, void 0, function* () {
         let params = event.queryStringParameters;
         let resource = event.resource;
         let method = event.httpMethod;
@@ -44,4 +59,3 @@ function serve(event) {
         };
     });
 }
-exports.serve = serve;

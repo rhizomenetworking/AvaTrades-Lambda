@@ -3,6 +3,18 @@ import { createTrade, createBid, setRoyalty, readTrade, readRoyalty } from "./se
 
 //TODO: Add Helpful error messages
 export async function serve(event: any): Promise<any> {
+    try {
+        return _serve(event);
+    } catch (err) {
+        console.error(err);
+        return {
+            'statusCode': 500,
+            'body': "Internal Server Error"
+        }
+    }
+}
+
+async function _serve(event: any): Promise<any> {
     let params = event.queryStringParameters;
     let resource = event.resource;
     let method = event.httpMethod;

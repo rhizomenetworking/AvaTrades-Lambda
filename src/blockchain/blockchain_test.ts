@@ -577,8 +577,8 @@ async function addTestCase_C2(test_suite: TestSuite): Promise<TestSuite> {
     let artist_address = makeKeyPair("Fuji-x").getAddress();
     let now = new Date().getTime();
     let signature: Buffer = new Buffer(""); 
-    let royalty = makeRoyalty(NFT_ID, artist_address, new BN(21), "Fuji-x", now, artist_address, signature);
-    let cut = CENTIAVAX.divRound(royalty.divisor)
+    let royalty = makeRoyalty(NFT_ID, artist_address, new BN(21), new BN(10000), "Fuji-x", now, artist_address, signature); 
+    let cut = CENTIAVAX.mul(royalty.numerator).divRound(royalty.divisor)
 
     let profit_addresss = getProfitAddress("Fuji-x");
     let chain_fee = getNetwork("Fuji-x").XChain().getTxFee();
@@ -609,8 +609,8 @@ async function addTestCase_C2(test_suite: TestSuite): Promise<TestSuite> {
     return test_suite
 }
 
-async function tmp() {
-    let res = await runBlockchainTestSuite();
-    console.log(res);
-}
-tmp()
+// async function tmp() {
+//     let res = await runBlockchainTestSuite();
+//     console.log(res);
+// }
+// tmp()

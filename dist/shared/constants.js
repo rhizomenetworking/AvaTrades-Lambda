@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TEST_SUPPLIER_ADDRESS = exports.TEST_FT_ID = exports.TEST_NFT_ID = exports.FUJI_PROFIT_ADDRESS = exports.AVALANCHE_PROFIT_ADDRESS = exports.TEST_DATABASE_NAME = exports.LIVE_DATABASE_NAME = exports.FUJI_NETWORK = exports.AVALANCHE_NETWORK = exports.SERVICE_FEE = exports.JOB = void 0;
+exports.TEST_SUPPLIER_ADDRESS = exports.TEST_FT_ID = exports.TEST_NFT_ID = exports.FUJI_PROFIT_ADDRESS = exports.AVALANCHE_PROFIT_ADDRESS = exports.TEST_DATABASE_NAME = exports.LIVE_DATABASE_NAME = exports.FUJI_NETWORK = exports.AVALANCHE_NETWORK = exports.SERVICE_FEE = exports.FIXED_DURATION = exports.AUCTION_DURATION = exports.WALLET_DURATION = exports.JOB = void 0;
 const avalanche_1 = require("avalanche");
 exports.JOB = "TEST";
+exports.WALLET_DURATION = 900000;
+exports.AUCTION_DURATION = 172800000;
+exports.FIXED_DURATION = 604800000;
 exports.SERVICE_FEE = new avalanche_1.BN(2000000);
 exports.AVALANCHE_NETWORK = new avalanche_1.Avalanche("api.avax.network", 443, "https", 1);
 exports.FUJI_NETWORK = new avalanche_1.Avalanche("api.avax-test.network", 443, "https", 5);

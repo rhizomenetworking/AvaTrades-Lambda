@@ -252,7 +252,7 @@ function exchange(txc, trade, bidder, royalty) {
                 bid_price = trade.ask;
             }
             if (royalty !== undefined) {
-                let cut = bid_price.divRound(royalty.divisor);
+                let cut = bid_price.mul(royalty.numerator).divRound(royalty.divisor);
                 txc = (0, tx_construction_1.addOutput)(txc, royalty.proceeds_address, avax_id, cut);
                 bid_price = bid_price.sub(cut);
             }

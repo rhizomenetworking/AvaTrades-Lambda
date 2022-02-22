@@ -1,7 +1,7 @@
 import { BN, Buffer } from "avalanche"
 import { UTXO, KeyPair} from "avalanche/dist/apis/avm"
 import { v4 as uuid} from "uuid"
-import { SERVICE_FEE } from "./constants"
+import { SERVICE_FEE, WALLET_DURATION, AUCTION_DURATION, FIXED_DURATION } from "./constants"
 import { Chain, getAvaxID, makeKeyPair } from "./utilities"
 
 type TradeMode = "FIXED" | "AUCTION";
@@ -28,7 +28,8 @@ interface Bid {
 interface Royalty {
     asset_id: Buffer;
     proceeds_address: Buffer;
-    divisor: number;
+    numerator: BN;
+    divisor: BN;
     chain: Chain;
     timestamp: number;
     minter_address: Buffer;
@@ -48,15 +49,15 @@ interface Wallet {
 
 async function makeTrade(asset_id: Buffer, ask: BN, mode: TradeMode, proceeds_address: Buffer, chain: Chain): Promise<Trade> {
     let now = new Date().getTime();
-    let two_days_from_now = now + 172800;
-    let week_from_now = now + 604800;
+    let auction_deadline = now + AUCTION_DURATION;
+    let fixed_deadline = now + FIXED_DURATION;
     return {
         "id": uuid(),
         "ask": ask,
         "mode": mode,
         "proceeds_address": proceeds_address,
         "wallet": await makeWallet(chain, SERVICE_FEE, asset_id),
-        "deadline": (mode === "AUCTION") ? two_days_from_now : week_from_now,
+        "deadline": (mode === "AUCTION") ? auction_deadline : fixed_deadline,
         "status": "PENDING",
         "receipt": []
     }
@@ -71,10 +72,11 @@ async function makeBid(trade: Trade, proceeds_address: Buffer): Promise<Bid> {
     }
 }
 
-function makeRoyalty(asset_id: Buffer, proceeds_address: Buffer, divisor: number, chain: Chain, timestamp: number, minter_address: Buffer, minter_signature: Buffer): Royalty {
+function makeRoyalty(asset_id: Buffer, proceeds_address: Buffer, numerator: BN, divisor: BN, chain: Chain, timestamp: number, minter_address: Buffer, minter_signature: Buffer): Royalty {
     return {
         "asset_id": asset_id,
         "proceeds_address": proceeds_address,
+        "numerator": numerator,
         "divisor": divisor,
         "chain": chain,
         "timestamp": timestamp, 
@@ -85,7 +87,7 @@ function makeRoyalty(asset_id: Buffer, proceeds_address: Buffer, divisor: number
 
 async function makeWallet(chain: Chain, avax_requirement: BN, asset_id?: Buffer): Promise<Wallet> {
     let now = new Date().getTime();
-    let half_hour_from_now = now + 1800000;
+    let expiration = now + WALLET_DURATION;
     let avax_id = await getAvaxID(chain);
     let asset_ids = [avax_id];
     if (asset_id !== undefined) {
@@ -97,7 +99,7 @@ async function makeWallet(chain: Chain, avax_requirement: BN, asset_id?: Buffer)
         "chain": chain,
         "asset_ids": asset_ids,
         "avax_requirement": avax_requirement,
-        "expiration": half_hour_from_now,
+        "expiration": expiration,
         "address": address,
         "private_key": key_pair,
         "utxos": [],

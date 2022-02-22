@@ -476,8 +476,8 @@ function addTestCase_C2(test_suite) {
         let artist_address = (0, utilities_1.makeKeyPair)("Fuji-x").getAddress();
         let now = new Date().getTime();
         let signature = new avalanche_1.Buffer("");
-        let royalty = (0, model_1.makeRoyalty)(NFT_ID, artist_address, new avalanche_1.BN(21), "Fuji-x", now, artist_address, signature);
-        let cut = CENTIAVAX.divRound(royalty.divisor);
+        let royalty = (0, model_1.makeRoyalty)(NFT_ID, artist_address, new avalanche_1.BN(21), new avalanche_1.BN(10000), "Fuji-x", now, artist_address, signature);
+        let cut = CENTIAVAX.mul(royalty.numerator).divRound(royalty.divisor);
         let profit_addresss = (0, utilities_1.getProfitAddress)("Fuji-x");
         let chain_fee = (0, utilities_1.getNetwork)("Fuji-x").XChain().getTxFee();
         let avax_id = yield (0, utilities_1.getAvaxID)("Fuji-x");
@@ -499,10 +499,8 @@ function addTestCase_C2(test_suite) {
         return test_suite;
     });
 }
-function tmp() {
-    return __awaiter(this, void 0, void 0, function* () {
-        let res = yield runBlockchainTestSuite();
-        console.log(res);
-    });
-}
-tmp();
+// async function tmp() {
+//     let res = await runBlockchainTestSuite();
+//     console.log(res);
+// }
+// tmp()

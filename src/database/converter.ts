@@ -91,7 +91,8 @@ function royaltyAsItem(royalty: Royalty): any {
             "M": {
                 "asset_id": {"S": asset_id_string},
                 "proceeds_address": {"S": stringFromAddress(royalty.chain, royalty.proceeds_address)},
-                "divisor": {"S": royalty.divisor.toString()},
+                "numerator": {"S": royalty.numerator.toJSON()},
+                "divisor": {"S": royalty.divisor.toJSON()},
                 "chain": {"S": royalty.chain},
                 "timestamp": {"S": royalty.timestamp.toString()},
                 "minter_address": {"S": stringFromAddress(royalty.chain, royalty.minter_address)},
@@ -111,7 +112,8 @@ function itemAsRoyalty(item: any): Royalty {
     return {
         "asset_id": asset_id,
         "proceeds_address": proceeds_address,
-        "divisor": parseInt(properties.divisor["S"]),
+        "numerator": new BN(properties.numerator["S"], 16),
+        "divisor": new BN(properties.divisor["S"], 16),
         "chain": chain,
         "timestamp": parseInt(properties.timestamp["S"]), 
         "minter_address": minter_address,
